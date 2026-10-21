@@ -8,31 +8,43 @@ import (
 	"sierra-rollout/internal/plugin"
 )
 
-// MockRamper records traffic state in memory.
+// MockRamper records live and shadow traffic state in memory.
 type MockRamper struct {
 	mu      sync.Mutex
-	state   map[plugin.Target]plugin.RampResult
+	state   map[stateKey]plugin.RampResult
 	history []plugin.RampRequest
 }
 
+type stateKey struct {
+	target plugin.Target
+	mode   string
+}
+
 func NewMockRamper() *MockRamper {
-	return &MockRamper{state: map[plugin.Target]plugin.RampResult{}}
+	return &MockRamper{state: map[stateKey]plugin.RampResult{}}
+}
+
+func mode(m string) string {
+	if m == "" {
+		return plugin.ModeLive
+	}
+	return m
 }
 
 func (m *MockRamper) SetPercent(_ context.Context, r plugin.RampRequest) (plugin.RampResult, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	res := plugin.RampResult{Percent: r.Percent, Version: r.Version}
-	m.state[r.Target] = res
+	m.state[stateKey{r.Target, mode(r.Mode)}] = res
 	m.history = append(m.history, r)
-	slog.Info("mock ramp", "target", r.Target, "version", r.Version, "percent", r.Percent)
+	slog.Info("mock ramp", "target", r.Target, "version", r.Version, "percent", r.Percent, "mode", mode(r.Mode))
 	return res, nil
 }
 
-func (m *MockRamper) Current(_ context.Context, t plugin.Target) (int, string, error) {
+func (m *MockRamper) Current(_ context.Context, t plugin.Target, md string) (int, string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	s := m.state[t]
+	s := m.state[stateKey{t, mode(md)}]
 	return s.Percent, s.Version, nil
 }
 

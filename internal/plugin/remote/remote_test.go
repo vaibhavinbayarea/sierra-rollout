@@ -43,16 +43,20 @@ func (f *fakeValidator) Validate(ctx context.Context, r *pb.ValidateRequest) (*p
 
 type fakeRamper struct {
 	pb.UnimplementedRamperServiceServer
-	pct int32
-	ver string
+	pct      int32
+	ver      string
+	modes    []pb.RampMode
+	curModes []pb.RampMode
 }
 
 func (f *fakeRamper) SetPercent(_ context.Context, r *pb.SetPercentRequest) (*pb.SetPercentResponse, error) {
 	f.pct, f.ver = r.Percent, r.Version
+	f.modes = append(f.modes, r.Mode)
 	return &pb.SetPercentResponse{Percent: f.pct, Version: f.ver}, nil
 }
 
-func (f *fakeRamper) Current(context.Context, *pb.CurrentRequest) (*pb.CurrentResponse, error) {
+func (f *fakeRamper) Current(_ context.Context, r *pb.CurrentRequest) (*pb.CurrentResponse, error) {
+	f.curModes = append(f.curModes, r.Mode)
 	return &pb.CurrentResponse{Percent: f.pct, Version: f.ver}, nil
 }
 
@@ -121,8 +125,34 @@ func TestRamperRoundTrip(t *testing.T) {
 	res, err := r.SetPercent(context.Background(), plugin.RampRequest{Version: "v2", Percent: 25})
 	require.NoError(t, err)
 	assert.Equal(t, plugin.RampResult{Percent: 25, Version: "v2"}, res)
-	pct, ver, err := r.Current(context.Background(), plugin.Target{})
+	pct, ver, err := r.Current(context.Background(), plugin.Target{}, "")
 	require.NoError(t, err)
 	assert.Equal(t, 25, pct)
 	assert.Equal(t, "v2", ver)
+}
+
+func TestRampModeMapping(t *testing.T) {
+	f := &fakeRamper{}
+	opts := serve(t, func(s *grpc.Server) { pb.RegisterRamperServiceServer(s, f) })
+	impl, err := New(registry.Entry{Name: "team/r", Kind: registry.KindRamper, Endpoint: "passthrough:///bufnet", Timeout: time.Second}, opts...)
+	require.NoError(t, err)
+	r := impl.(plugin.Ramper)
+	ctx := context.Background()
+	for _, m := range []string{"shadow", "live", ""} {
+		_, err := r.SetPercent(ctx, plugin.RampRequest{Percent: 10, Mode: m})
+		require.NoError(t, err)
+	}
+	_, _, err = r.Current(ctx, plugin.Target{}, "shadow")
+	require.NoError(t, err)
+	assert.Equal(t, []pb.RampMode{pb.RampMode_RAMP_MODE_SHADOW, pb.RampMode_RAMP_MODE_LIVE, pb.RampMode_RAMP_MODE_LIVE}, f.modes)
+	assert.Equal(t, []pb.RampMode{pb.RampMode_RAMP_MODE_SHADOW}, f.curModes)
+}
+
+func TestRampModeUnknownRejected(t *testing.T) {
+	f := &fakeRamper{}
+	opts := serve(t, func(s *grpc.Server) { pb.RegisterRamperServiceServer(s, f) })
+	impl, err := New(registry.Entry{Name: "team/r", Kind: registry.KindRamper, Endpoint: "passthrough:///bufnet", Timeout: time.Second}, opts...)
+	require.NoError(t, err)
+	_, err = impl.(plugin.Ramper).SetPercent(context.Background(), plugin.RampRequest{Percent: 10, Mode: "sideways"})
+	assert.ErrorContains(t, err, "sideways")
 }

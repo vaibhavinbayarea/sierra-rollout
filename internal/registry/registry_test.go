@@ -74,3 +74,17 @@ func TestValidateParams(t *testing.T) {
 	assert.NoError(t, r.ValidateParams("log-notifier", nil))
 	assert.Error(t, r.ValidateParams("nope", nil))
 }
+
+func TestLoadModes(t *testing.T) {
+	r, err := Load(writeRegistry(t, builtins+"  - { name: team/r, kind: ramper, endpoint: h:1, modes: [live, shadow] }\n  - { name: team/l, kind: ramper, endpoint: h:1 }\n"))
+	require.NoError(t, err)
+	mock, _ := r.Get("mock-ramper")
+	assert.Equal(t, []string{"live", "shadow"}, mock.Modes)
+	tr, _ := r.Get("team/r")
+	assert.Equal(t, []string{"live", "shadow"}, tr.Modes)
+	tl, _ := r.Get("team/l")
+	assert.Equal(t, []string{"live"}, tl.Modes)
+
+	_, err = Load(writeRegistry(t, "  - { name: team/x, kind: ramper, endpoint: h:1, modes: [sideways] }\n"))
+	assert.ErrorContains(t, err, "sideways")
+}

@@ -24,22 +24,37 @@ func (goodValidator) Describe(context.Context, *pb.DescribeRequest) (*pb.Describ
 		ParamsJsonSchema: `{"type":"object","properties":{"threshold":{"type":"number"}}}`}, nil
 }
 
+// goodRamper keeps percent per mode; modes lists what Describe advertises.
 type goodRamper struct {
 	pb.UnimplementedRamperServiceServer
-	pct int32
+	pct      map[pb.RampMode]int32
+	modes    []string
+	sawModes map[pb.RampMode]bool
+}
+
+func newRamper(modes ...string) *goodRamper {
+	return &goodRamper{pct: map[pb.RampMode]int32{}, modes: modes, sawModes: map[pb.RampMode]bool{}}
+}
+
+func norm(m pb.RampMode) pb.RampMode {
+	if m == pb.RampMode_RAMP_MODE_UNSPECIFIED {
+		return pb.RampMode_RAMP_MODE_LIVE
+	}
+	return m
 }
 
 func (r *goodRamper) SetPercent(_ context.Context, req *pb.SetPercentRequest) (*pb.SetPercentResponse, error) {
-	r.pct = req.Percent
-	return &pb.SetPercentResponse{Percent: r.pct, Version: req.Version}, nil
+	r.sawModes[norm(req.Mode)] = true
+	r.pct[norm(req.Mode)] = req.Percent
+	return &pb.SetPercentResponse{Percent: req.Percent, Version: req.Version}, nil
 }
 
-func (r *goodRamper) Current(context.Context, *pb.CurrentRequest) (*pb.CurrentResponse, error) {
-	return &pb.CurrentResponse{Percent: r.pct}, nil
+func (r *goodRamper) Current(_ context.Context, req *pb.CurrentRequest) (*pb.CurrentResponse, error) {
+	return &pb.CurrentResponse{Percent: r.pct[norm(req.Mode)]}, nil
 }
 
 func (r *goodRamper) Describe(context.Context, *pb.DescribeRequest) (*pb.DescribeResponse, error) {
-	return &pb.DescribeResponse{Name: "team/ramp", Kind: "ramper", Version: "1.0.0", ParamsJsonSchema: `{"type":"object"}`}, nil
+	return &pb.DescribeResponse{Name: "team/ramp", Kind: "ramper", Version: "1.0.0", ParamsJsonSchema: `{"type":"object"}`, Modes: r.modes}, nil
 }
 
 func listen(t *testing.T, register func(*grpc.Server)) string {
@@ -59,6 +74,19 @@ func TestValidatorContract(t *testing.T) {
 }
 
 func TestRamperContract(t *testing.T) {
-	addr := listen(t, func(s *grpc.Server) { pb.RegisterRamperServiceServer(s, &goodRamper{}) })
+	r := newRamper()
+	addr := listen(t, func(s *grpc.Server) { pb.RegisterRamperServiceServer(s, r) })
 	Ramper(t, addr)
+	if r.sawModes[pb.RampMode_RAMP_MODE_SHADOW] {
+		t.Error("shadow checked although Describe did not advertise it")
+	}
+}
+
+func TestRamperContractShadow(t *testing.T) {
+	r := newRamper("live", "shadow")
+	addr := listen(t, func(s *grpc.Server) { pb.RegisterRamperServiceServer(s, r) })
+	Ramper(t, addr)
+	if !r.sawModes[pb.RampMode_RAMP_MODE_SHADOW] {
+		t.Error("shadow not checked although Describe advertises it")
+	}
 }

@@ -6,6 +6,7 @@ package plugincontract
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -90,23 +91,44 @@ func Validator(t *testing.T, addr string, sampleParams map[string]any) {
 // Ramper checks a RamperService at addr, including SetPercent idempotency.
 func Ramper(t *testing.T, addr string) {
 	c := pb.NewRamperServiceClient(dial(t, addr))
+	var modes []string
 	t.Run("Describe", func(t *testing.T) {
 		d, err := c.Describe(ctx(t), &pb.DescribeRequest{})
 		checkDescribe(t, d, err, "ramper")
+		if d != nil {
+			modes = d.Modes
+		}
 	})
-	t.Run("SetPercentIsIdempotent", func(t *testing.T) {
-		target := &pb.Target{Agent: "contract-test", Stage: "staging", Wave: "default", Customer: "_", Region: "test"}
-		for i := 0; i < 2; i++ {
-			if _, err := c.SetPercent(ctx(t), &pb.SetPercentRequest{Target: target, Version: "v0", Percent: 10}); err != nil {
-				t.Fatalf("SetPercent call %d: %v", i+1, err)
+	t.Run("SetPercentIsIdempotent", func(t *testing.T) { checkIdempotent(t, c, pb.RampMode_RAMP_MODE_LIVE, 10) })
+	if slices.Contains(modes, "shadow") {
+		// Shadow state must be independent of live state.
+		t.Run("ShadowSetPercentIsIdempotent", func(t *testing.T) { checkIdempotent(t, c, pb.RampMode_RAMP_MODE_SHADOW, 30) })
+		t.Run("LiveUnaffectedByShadow", func(t *testing.T) {
+			cur, err := c.Current(ctx(t), &pb.CurrentRequest{Target: contractTarget, Mode: pb.RampMode_RAMP_MODE_LIVE})
+			if err != nil {
+				t.Fatalf("Current: %v", err)
 			}
+			if cur.Percent != 10 {
+				t.Errorf("live percent = %d after shadow SetPercent(30), want 10", cur.Percent)
+			}
+		})
+	}
+}
+
+var contractTarget = &pb.Target{Agent: "contract-test", Stage: "staging", Wave: "default", Customer: "_", Region: "test"}
+
+func checkIdempotent(t *testing.T, c pb.RamperServiceClient, mode pb.RampMode, pct int32) {
+	t.Helper()
+	for i := 0; i < 2; i++ {
+		if _, err := c.SetPercent(ctx(t), &pb.SetPercentRequest{Target: contractTarget, Version: "v0", Percent: pct, Mode: mode}); err != nil {
+			t.Fatalf("SetPercent(%s) call %d: %v", mode, i+1, err)
 		}
-		cur, err := c.Current(ctx(t), &pb.CurrentRequest{Target: target})
-		if err != nil {
-			t.Fatalf("Current: %v", err)
-		}
-		if cur.Percent != 10 {
-			t.Errorf("Current percent = %d after SetPercent(10) twice, want 10", cur.Percent)
-		}
-	})
+	}
+	cur, err := c.Current(ctx(t), &pb.CurrentRequest{Target: contractTarget, Mode: mode})
+	if err != nil {
+		t.Fatalf("Current(%s): %v", mode, err)
+	}
+	if cur.Percent != pct {
+		t.Errorf("Current(%s) percent = %d after SetPercent(%d) twice, want %d", mode, cur.Percent, pct, pct)
+	}
 }

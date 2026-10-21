@@ -7,7 +7,7 @@ lint:
 	go vet ./...
 
 proto:
-	go tool buf generate
+	go run github.com/bufbuild/buf/cmd/buf@v1.47.2 generate
 
 build:
 	go build -o bin/ ./cmd/...

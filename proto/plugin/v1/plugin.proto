@@ -22,14 +22,23 @@ message DescribeResponse {
   string kind = 2; // ramper | validator | notifier
   string version = 3;
   string params_json_schema = 4;
+  repeated string modes = 5; // rampers: supported modes ("live", "shadow"); empty means live only
 }
 
-// SetPercent must be idempotent and absolute.
+// RampMode selects live traffic or mirrored (shadow) traffic.
+enum RampMode {
+  RAMP_MODE_UNSPECIFIED = 0; // treated as live
+  RAMP_MODE_LIVE = 1;
+  RAMP_MODE_SHADOW = 2;      // mirrored traffic; responses are discarded
+}
+
+// SetPercent must be idempotent and absolute, per mode.
 message SetPercentRequest {
   Target target = 1;
   string version = 2;
   int32 percent = 3;
   google.protobuf.Struct params = 4;
+  RampMode mode = 5;
 }
 
 message SetPercentResponse {
@@ -39,6 +48,7 @@ message SetPercentResponse {
 
 message CurrentRequest {
   Target target = 1;
+  RampMode mode = 2;
 }
 
 message CurrentResponse {

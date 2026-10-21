@@ -59,17 +59,25 @@ func (r *ramper) SetPercent(ctx context.Context, req plugin.RampRequest) (plugin
 	if err != nil {
 		return plugin.RampResult{}, err
 	}
-	resp, err := r.c.SetPercent(ctx, &pb.SetPercentRequest{Target: toTarget(req.Target), Version: req.Version, Percent: int32(req.Percent), Params: params})
+	mode, err := toMode(req.Mode)
+	if err != nil {
+		return plugin.RampResult{}, err
+	}
+	resp, err := r.c.SetPercent(ctx, &pb.SetPercentRequest{Target: toTarget(req.Target), Version: req.Version, Percent: int32(req.Percent), Params: params, Mode: mode})
 	if err != nil {
 		return plugin.RampResult{}, err
 	}
 	return plugin.RampResult{Percent: int(resp.Percent), Version: resp.Version}, nil
 }
 
-func (r *ramper) Current(ctx context.Context, t plugin.Target) (int, string, error) {
+func (r *ramper) Current(ctx context.Context, t plugin.Target, mode string) (int, string, error) {
 	ctx, cancel := r.ctx(ctx)
 	defer cancel()
-	resp, err := r.c.Current(ctx, &pb.CurrentRequest{Target: toTarget(t)})
+	m, err := toMode(mode)
+	if err != nil {
+		return 0, "", err
+	}
+	resp, err := r.c.Current(ctx, &pb.CurrentRequest{Target: toTarget(t), Mode: m})
 	if err != nil {
 		return 0, "", err
 	}
@@ -127,6 +135,16 @@ func (n *notifier) Notify(ctx context.Context, e plugin.Event) error {
 	}
 	_, err = n.c.Notify(ctx, &pb.NotifyRequest{RolloutId: e.RolloutID, Target: toTarget(e.Target), Kind: e.Kind, Message: e.Message, Details: details})
 	return err
+}
+
+func toMode(m string) (pb.RampMode, error) {
+	switch m {
+	case "", plugin.ModeLive:
+		return pb.RampMode_RAMP_MODE_LIVE, nil
+	case plugin.ModeShadow:
+		return pb.RampMode_RAMP_MODE_SHADOW, nil
+	}
+	return 0, fmt.Errorf("unknown ramp mode %q", m)
 }
 
 func toTarget(t plugin.Target) *pb.Target {

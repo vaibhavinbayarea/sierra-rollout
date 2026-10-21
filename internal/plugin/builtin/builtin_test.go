@@ -63,11 +63,11 @@ func TestMockRamperIdempotent(t *testing.T) {
 	_, err := m.SetPercent(ctx, plugin.RampRequest{Target: b, Version: "v1", Percent: 50})
 	require.NoError(t, err)
 
-	pct, ver, err := m.Current(ctx, a)
+	pct, ver, err := m.Current(ctx, a, "live")
 	require.NoError(t, err)
 	assert.Equal(t, 25, pct)
 	assert.Equal(t, "v1", ver)
-	pct, _, _ = m.Current(ctx, b)
+	pct, _, _ = m.Current(ctx, b, "live")
 	assert.Equal(t, 50, pct)
 	assert.Len(t, m.History(), 3)
 }
@@ -75,4 +75,21 @@ func TestMockRamperIdempotent(t *testing.T) {
 func TestLogNotifier(t *testing.T) {
 	n := Register()["log-notifier"].(plugin.Notifier)
 	assert.NoError(t, n.Notify(context.Background(), plugin.Event{RolloutID: "ro/x", Kind: "failed", Message: "m"}))
+}
+
+func TestMockRamperSeparatesModes(t *testing.T) {
+	m := NewMockRamper()
+	ctx := context.Background()
+	tg := plugin.Target{Agent: "x", Region: "r"}
+	_, err := m.SetPercent(ctx, plugin.RampRequest{Target: tg, Version: "v1", Percent: 10})
+	require.NoError(t, err)
+	_, err = m.SetPercent(ctx, plugin.RampRequest{Target: tg, Version: "v2", Percent: 100, Mode: "shadow"})
+	require.NoError(t, err)
+	live, _, _ := m.Current(ctx, tg, "live")
+	shadow, ver, _ := m.Current(ctx, tg, "shadow")
+	assert.Equal(t, 10, live)
+	assert.Equal(t, 100, shadow)
+	assert.Equal(t, "v2", ver)
+	empty, _, _ := m.Current(ctx, tg, "")
+	assert.Equal(t, 10, empty, "empty mode means live")
 }

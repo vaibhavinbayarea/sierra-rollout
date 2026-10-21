@@ -17,10 +17,17 @@ type Target struct {
 	Region   string `json:"region"`
 }
 
+// Ramp modes. Empty means live.
+const (
+	ModeLive   = "live"
+	ModeShadow = "shadow" // mirrored traffic; responses are discarded
+)
+
 type RampRequest struct {
 	Target  Target
 	Version string
 	Percent int
+	Mode    string // ModeLive (or empty) or ModeShadow
 	Params  map[string]any
 }
 
@@ -46,10 +53,10 @@ type Event struct {
 	Details   map[string]any `json:"details,omitempty"`
 }
 
-// Ramper moves traffic. SetPercent must be idempotent and absolute.
+// Ramper moves traffic. SetPercent must be idempotent and absolute, per mode.
 type Ramper interface {
 	SetPercent(ctx context.Context, r RampRequest) (RampResult, error)
-	Current(ctx context.Context, t Target) (percent int, version string, err error)
+	Current(ctx context.Context, t Target, mode string) (percent int, version string, err error)
 }
 
 // Validator is stateless; long waits are expressed as AWAIT_SIGNAL.

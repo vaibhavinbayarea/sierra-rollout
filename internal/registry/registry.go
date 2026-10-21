@@ -31,6 +31,7 @@ type Entry struct {
 	Endpoint     string
 	Timeout      time.Duration // 0 means the kind's default
 	ParamsSchema json.RawMessage
+	Modes        []string // ramper traffic modes: live, shadow
 }
 
 type Registry struct {
@@ -50,13 +51,17 @@ var builtinKinds = map[string]Kind{
 	"log-notifier":    KindNotifier,
 }
 
+// builtinModes lists traffic modes of built-in rampers beyond live.
+var builtinModes = map[string][]string{"mock-ramper": {"live", "shadow"}}
+
 type fileEntry struct {
 	Name         string `yaml:"name"`
 	Kind         Kind   `yaml:"kind"`
 	Builtin      bool   `yaml:"builtin"`
 	Endpoint     string `yaml:"endpoint"`
 	Timeout      string `yaml:"timeout"`
-	ParamsSchema string `yaml:"params_schema"`
+	ParamsSchema string   `yaml:"params_schema"`
+	Modes        []string `yaml:"modes"`
 }
 
 // Load reads a registry file. params_schema paths are relative to it.
@@ -96,7 +101,15 @@ func Load(path string) (*Registry, error) {
 }
 
 func toEntry(fe fileEntry, dir string) (Entry, error) {
-	e := Entry{Name: fe.Name, Kind: fe.Kind, Builtin: fe.Builtin, Endpoint: fe.Endpoint}
+	e := Entry{Name: fe.Name, Kind: fe.Kind, Builtin: fe.Builtin, Endpoint: fe.Endpoint, Modes: fe.Modes}
+	if len(e.Modes) == 0 {
+		e.Modes = []string{"live"}
+	}
+	for _, m := range e.Modes {
+		if m != "live" && m != "shadow" {
+			return e, fmt.Errorf("unknown mode %q (want live or shadow)", m)
+		}
+	}
 	if e.Name == "" {
 		return e, fmt.Errorf("name is required")
 	}
@@ -125,6 +138,9 @@ func toEntry(fe fileEntry, dir string) (Entry, error) {
 			return e, err
 		}
 		e.ParamsSchema = b
+		if m, ok := builtinModes[e.Name]; ok {
+			e.Modes = m
+		}
 		return e, nil
 	}
 	if e.Endpoint == "" {
