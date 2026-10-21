@@ -3,6 +3,8 @@ package workflows
 import (
 	"time"
 
+	"go.temporal.io/sdk/workflow"
+
 	"sierra-rollout/internal/plan"
 )
 
@@ -41,6 +43,9 @@ type TargetStatus struct {
 	AwaitingApproval []string                `json:"awaiting_approval,omitempty"`
 	Message          string                  `json:"message,omitempty"`
 	At               time.Time               `json:"at"`
+	// Seq increases with every update from a target, so the global can
+	// ignore updates delivered out of order.
+	Seq int `json:"seq"`
 }
 
 var severity = map[string]int{Succeeded: 0, Held: 1, Aborted: 2}
@@ -71,4 +76,24 @@ type RolloutStatus struct {
 	Order           []string                `json:"order"`
 	Targets         map[string]TargetStatus `json:"targets"`
 	Message         string                  `json:"message,omitempty"`
+}
+
+// applyProgress records ts unless a newer update for the target was
+// already applied.
+func applyProgress(st *RolloutStatus, ts TargetStatus) {
+	if cur, ok := st.Targets[ts.ID]; ok && cur.Seq >= ts.Seq && cur.Seq > 0 {
+		return
+	}
+	st.Targets[ts.ID] = ts
+}
+
+// drainProgress applies every progress signal already buffered on c.
+func drainProgress(c workflow.ReceiveChannel, st *RolloutStatus) {
+	for {
+		var ts TargetStatus
+		if !c.ReceiveAsync(&ts) {
+			return
+		}
+		applyProgress(st, ts)
+	}
 }

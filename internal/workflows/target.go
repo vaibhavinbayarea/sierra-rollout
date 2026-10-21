@@ -395,6 +395,7 @@ func (r *runner) signalLoop() {
 
 func (r *runner) setState(state, msg string) {
 	r.status.State = state
+	r.status.Seq++
 	if msg != "" || state == StateSucceeded {
 		r.status.Message = msg
 	}

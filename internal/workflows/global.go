@@ -31,7 +31,7 @@ func GlobalRollout(ctx workflow.Context, p plan.Plan) (RolloutStatus, error) {
 	apply := func(c workflow.ReceiveChannel) {
 		var ts TargetStatus
 		c.Receive(ctx, &ts)
-		st.Targets[ts.ID] = ts
+		applyProgress(&st, ts)
 	}
 	stagesCtx, cancel := workflow.WithCancel(ctx)
 	aborted := false
@@ -67,8 +67,7 @@ func GlobalRollout(ctx workflow.Context, p plan.Plan) (RolloutStatus, error) {
 		result = Aborted
 	}
 	// Apply progress signals that arrived after the last stage finished.
-	for progress.ReceiveAsync(nil) {
-	}
+	drainProgress(progress, &st)
 	st.State, st.WaitingForStage = result, ""
 	return st, nil
 }
