@@ -1,0 +1,1 @@
+{"type":"object","properties":{"path":{"type":"string"},"stub":{"type":"object","properties":{"outcome":{"enum":["PASS","FAIL","INCONCLUSIVE","AWAIT_SIGNAL"]},"after_attempt":{"type":"integer","minimum":1}},"required":["outcome"],"additionalProperties":false}},"required":["path"],"additionalProperties":false}

@@ -1,0 +1,8 @@
+plugins:
+  - { name: prometheus,      kind: validator, builtin: true }
+  - { name: http-health,     kind: validator, builtin: true }
+  - { name: manual-approval, kind: validator, builtin: true }
+  - { name: mock-ramper,     kind: ramper,    builtin: true }
+  - { name: log-notifier,    kind: notifier,  builtin: true }
+  # - { name: eval-team/csat,  kind: validator, endpoint: csat-plugin.eval:9000,
+  #     timeout: 2m, params_schema: schemas/csat.json }
