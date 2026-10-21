@@ -1,0 +1,35 @@
+# Act 3: healthy team.
+apiVersion: rollout/v1
+agent: agent-foobar-3
+ramper: { plugin: mock-ramper, params: { service: agent-foobar-3 } }
+
+defaults:
+  steps: [10, 50, 100]
+  bake: 3s
+  decision: { inconclusive: { retry: 1, backoff: 3s, then: fail } }
+  on_failure:
+    - { notify: log-notifier }
+    - { pause: { timeout: 10m, on_timeout: hold } }
+
+validations:
+  health:     { plugin: http-health, params: { path: /healthz } }
+  error-rate: { plugin: prometheus, params: { query: 'rate(errors{agent="agent-foobar-3"}[5m])', max: 0.01 } }
+
+stages:
+  - name: staging
+    regions: [us-east-1]
+    steps: [100]
+    validate: [health]
+  - name: pre-prod
+    regions: [us-east-1, eu-west-1]
+    validate: [health, error-rate]
+  - name: prod
+    validate: [health, error-rate]
+    waves:
+      - name: canary
+        customers: [acme]
+        regions: [us-east-1]
+      - name: broad
+        customers: [globex, initech]
+        max_parallel: 2
+        regions: [us-east-1, eu-west-1]

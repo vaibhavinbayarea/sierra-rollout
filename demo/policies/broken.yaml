@@ -1,0 +1,12 @@
+# Act 4 (guardrails): every mistake here is caught at compile time, before anything runs.
+apiVersion: rollout/v1
+agent: Agent_Broken
+ramper: { plugin: mock-ramper }
+validations:
+  latency: { plugin: datadog, params: { query: p99 } }
+  health:  { plugin: http-health }
+stages:
+  - name: staging
+    regions: [us-east-1]
+    steps: [10, 50]
+    validate: [health, latency, smoke]

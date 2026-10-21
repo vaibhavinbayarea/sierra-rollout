@@ -1,0 +1,6 @@
+plugins:
+  - { name: prometheus,      kind: validator, builtin: true }
+  - { name: http-health,     kind: validator, builtin: true }
+  - { name: manual-approval, kind: validator, builtin: true }
+  - { name: mock-ramper,     kind: ramper,    builtin: true }
+  - { name: log-notifier,    kind: notifier,  builtin: true }
