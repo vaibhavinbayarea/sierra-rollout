@@ -1,0 +1,36 @@
+# Like policy.yaml, but pre-prod's error-rate fails its first attempt in each
+# region, pausing the target until an operator retries or resumes it.
+apiVersion: rollout/v1
+agent: support-agent
+ramper: { plugin: mock-ramper, params: { service: support-agent } }
+
+defaults:
+  steps: [10, 25, 50, 100]
+  bake: 10s
+  on_failure:
+    - { notify: log-notifier }
+    - { pause: { timeout: 1h, on_timeout: hold } }
+
+validations:
+  health:      { plugin: http-health, params: { path: /healthz } }
+  error-rate:  { plugin: prometheus, params: { query: 'rate(errors[5m])', max: 0.01 } }
+  flaky-error-rate:
+    plugin: prometheus
+    params: { query: 'rate(errors[5m])', max: 0.01, stub: { outcome: FAIL, after_attempt: 2 } }
+  signoff:     { plugin: manual-approval, when: final_step }
+
+stages:
+  - name: staging
+    regions: [us-east-1]
+    steps: [100]
+    validate: [health]
+  - name: pre-prod
+    regions: [us-east-1, eu-west-1]
+    steps: [100]
+    validate: [health, flaky-error-rate]
+  - name: prod
+    validate: [health, error-rate, signoff]
+    waves:
+      - name: canary
+        customers: [acme]
+        regions: [us-east-1]

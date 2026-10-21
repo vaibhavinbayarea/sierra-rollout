@@ -7,10 +7,11 @@ import (
 	"go.temporal.io/sdk/client"
 
 	"sierra-rollout/internal/registry"
+	"sierra-rollout/internal/workflows"
 )
 
 // TaskQueue is the Temporal task queue the rollout worker polls.
-const TaskQueue = "rollout"
+const TaskQueue = workflows.TaskQueue
 
 type server struct {
 	temporal  client.Client
