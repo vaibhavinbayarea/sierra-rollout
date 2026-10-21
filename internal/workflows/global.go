@@ -68,6 +68,12 @@ func GlobalRollout(ctx workflow.Context, p plan.Plan) (RolloutStatus, error) {
 	}
 	// Apply progress signals that arrived after the last stage finished.
 	drainProgress(progress, &st)
+	for id, ts := range st.Targets {
+		if ts.State == StatePending {
+			ts.State, ts.Message = StateSkipped, "not started: rollout ended "+result
+			st.Targets[id] = ts
+		}
+	}
 	st.State, st.WaitingForStage = result, ""
 	return st, nil
 }

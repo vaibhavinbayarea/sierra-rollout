@@ -283,10 +283,11 @@ func TestTargetWarningNotifies(t *testing.T) {
 func TestTargetStopAfterStep(t *testing.T) {
 	h := newHarness(t, pass)
 	h.signalAt(time.Minute, SignalStop, nil)
-	res := h.run(input([]plan.ValidationCall{health}, hold))
+	res := h.run(input([]plan.ValidationCall{health}, notifyLog, hold))
 	assert.Equal(t, Held, res.Status)
 	assert.Equal(t, []int{50}, h.rampPercents())
 	assert.Contains(t, res.Message, "sibling")
+	assert.Equal(t, []string{"held"}, h.notifies)
 }
 
 func TestTargetCancelled(t *testing.T) {

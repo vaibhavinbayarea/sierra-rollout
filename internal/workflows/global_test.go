@@ -69,8 +69,9 @@ func TestGlobalStopsAtHeldStage(t *testing.T) {
 	assert.Equal(t, Held, st.State)
 	assert.Equal(t, StateSucceeded, st.Targets["staging/default/_/us-east-1"].State)
 	assert.Equal(t, StateHeld, st.Targets["pre-prod/default/_/us-east-1"].State)
-	assert.Equal(t, StatePending, st.Targets["pre-prod/default/_/eu-west-1"].State)
-	assert.Equal(t, StatePending, st.Targets["prod/canary/acme/us-east-1"].State)
+	assert.Equal(t, StateSkipped, st.Targets["pre-prod/default/_/eu-west-1"].State)
+	assert.Equal(t, StateSkipped, st.Targets["prod/canary/acme/us-east-1"].State)
+	assert.Contains(t, st.Targets["prod/canary/acme/us-east-1"].Message, "not started")
 }
 
 func TestGlobalAbortWhilePaused(t *testing.T) {
@@ -89,6 +90,7 @@ func TestGlobalAbortWhilePaused(t *testing.T) {
 	assert.Equal(t, StatePaused, stateBeforeAbort)
 	assert.Equal(t, Aborted, st.State)
 	assert.Equal(t, StateAborted, st.Targets["pre-prod/default/_/us-east-1"].State)
+	assert.Equal(t, StateSkipped, st.Targets["prod/broad/initech/eu-west-1"].State)
 	assert.Less(t, h.env.Now().Sub(start), 3*time.Hour)
 }
 

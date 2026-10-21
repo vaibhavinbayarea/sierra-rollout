@@ -20,6 +20,7 @@ const (
 	StateSucceeded        = "succeeded"
 	StateHeld             = "held"
 	StateAborted          = "aborted"
+	StateSkipped          = "skipped" // never started: the rollout ended first
 )
 
 // Terminal statuses for targets, stages and rollouts.

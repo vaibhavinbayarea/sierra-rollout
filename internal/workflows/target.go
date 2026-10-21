@@ -128,7 +128,7 @@ func (r *runner) run() (TargetResult, error) {
 		}
 
 		if r.stop && i < len(r.t.Steps)-1 {
-			return r.end(Held, StateHeld, "stopped: sibling target failed"), nil
+			return r.held("stopped: sibling target failed"), nil
 		}
 	}
 	return r.end(Succeeded, StateSucceeded, ""), nil
