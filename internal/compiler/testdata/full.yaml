@@ -1,0 +1,43 @@
+apiVersion: rollout/v1
+agent: support-agent
+ramper: { plugin: mock-ramper, params: { service: support-agent } }
+
+concurrency: { pipelining: false }
+
+defaults:
+  steps: [10, 25, 50, 100]
+  bake: 5m
+  decision:
+    critical: all_pass
+    warning: notify
+    inconclusive: { retry: 3, backoff: 1m, then: fail }
+  on_failure:
+    - { notify: log-notifier }
+    - { pause: { timeout: 24h, on_timeout: hold } }
+
+validations:
+  error-rate: { plugin: prometheus, severity: critical,
+                params: { query: 'rate(errors[5m])', max: 0.01 } }
+  health:     { plugin: http-health, severity: critical, params: { path: /healthz } }
+  csat-drift: { plugin: eval-team/csat, severity: warning }
+  signoff:    { plugin: manual-approval, when: final_step }
+
+stages:
+  - name: staging
+    regions: [us-east-1]
+    steps: [100]
+    validate: [health]
+  - name: pre-prod
+    regions: [us-east-1, eu-west-1]
+    validate: [health, error-rate]
+  - name: prod
+    validate: [health, error-rate, csat-drift, signoff]
+    waves:
+      - name: canary
+        customers: [acme]
+        regions: [us-east-1]
+      - name: broad
+        customers: [globex, initech]
+        max_parallel: 2
+        regions: [us-east-1, eu-west-1]
+        steps: [25, 100]

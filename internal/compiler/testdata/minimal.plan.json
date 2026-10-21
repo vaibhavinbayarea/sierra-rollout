@@ -1,0 +1,71 @@
+{
+  "id": "ro/tiny",
+  "agent": "tiny",
+  "version": "v1.4.2",
+  "policy_hash": "6b152734b0437044d306bbf5c43263ba7cdf823e1ab365b9b0b232cfc2a5cdd8",
+  "pipelining": false,
+  "plugins": {
+    "log-notifier": {
+      "name": "log-notifier",
+      "kind": "notifier",
+      "builtin": true,
+      "timeout": 30000000000
+    },
+    "mock-ramper": {
+      "name": "mock-ramper",
+      "kind": "ramper",
+      "builtin": true,
+      "timeout": 300000000000
+    }
+  },
+  "stages": [
+    {
+      "name": "staging",
+      "waves": [
+        {
+          "name": "default",
+          "max_parallel": 1,
+          "customers": [
+            {
+              "customer": "_",
+              "targets": [
+                {
+                  "id": "staging/default/_/us-east-1",
+                  "stage": "staging",
+                  "wave": "default",
+                  "customer": "_",
+                  "region": "us-east-1",
+                  "ramper": {
+                    "plugin": "mock-ramper"
+                  },
+                  "steps": [
+                    100
+                  ],
+                  "bake": 0,
+                  "validations": null,
+                  "decision": {
+                    "critical": "all_pass",
+                    "warning": "notify",
+                    "warning_notifier": "log-notifier",
+                    "inconclusive": {
+                      "retry": 3,
+                      "backoff": 60000000000,
+                      "then": "fail"
+                    }
+                  },
+                  "on_failure": [
+                    {
+                      "kind": "pause",
+                      "timeout": 86400000000000,
+                      "on_timeout": "hold"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

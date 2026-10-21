@@ -1,0 +1,93 @@
+{
+  "id": "ro/solo/v1.4.2",
+  "agent": "solo",
+  "version": "v1.4.2",
+  "policy_hash": "be6d5106df51026357f0973438c904be3fabbbbe5083106797025b113cc06a82",
+  "pipelining": true,
+  "plugins": {
+    "http-health": {
+      "name": "http-health",
+      "kind": "validator",
+      "builtin": true,
+      "timeout": 120000000000
+    },
+    "log-notifier": {
+      "name": "log-notifier",
+      "kind": "notifier",
+      "builtin": true,
+      "timeout": 30000000000
+    },
+    "mock-ramper": {
+      "name": "mock-ramper",
+      "kind": "ramper",
+      "builtin": true,
+      "timeout": 300000000000
+    }
+  },
+  "stages": [
+    {
+      "name": "staging",
+      "waves": [
+        {
+          "name": "default",
+          "max_parallel": 1,
+          "customers": [
+            {
+              "customer": "_",
+              "targets": [
+                {
+                  "id": "staging/default/_/us-west-2",
+                  "stage": "staging",
+                  "wave": "default",
+                  "customer": "_",
+                  "region": "us-west-2",
+                  "ramper": {
+                    "plugin": "mock-ramper",
+                    "params": {
+                      "service": "solo"
+                    }
+                  },
+                  "steps": [
+                    50,
+                    100
+                  ],
+                  "bake": 120000000000,
+                  "validations": [
+                    {
+                      "name": "health",
+                      "plugin": "http-health",
+                      "params": {
+                        "path": "/healthz"
+                      },
+                      "severity": "critical",
+                      "when": "every_step"
+                    }
+                  ],
+                  "decision": {
+                    "critical": "all_pass",
+                    "warning": "ignore",
+                    "warning_notifier": "log-notifier",
+                    "inconclusive": {
+                      "retry": 3,
+                      "backoff": 60000000000,
+                      "then": "fail"
+                    }
+                  },
+                  "on_failure": [
+                    {
+                      "kind": "notify",
+                      "notifier": "log-notifier"
+                    },
+                    {
+                      "kind": "hold"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

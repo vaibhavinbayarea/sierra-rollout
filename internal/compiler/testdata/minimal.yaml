@@ -1,0 +1,6 @@
+apiVersion: rollout/v1
+agent: tiny
+ramper: { plugin: mock-ramper }
+stages:
+  - name: staging
+    regions: [us-east-1]

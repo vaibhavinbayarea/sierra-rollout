@@ -1,0 +1,15 @@
+apiVersion: rollout/v1
+agent: solo
+concurrency: { pipelining: true }
+defaults:
+  ramper: { plugin: mock-ramper, params: { service: solo } }
+  steps: [50, 100]
+  bake: 2m
+  regions: [us-west-2]
+  on_failure: [{ notify: log-notifier }, hold]
+validations:
+  health: { plugin: http-health, params: { path: /healthz } }
+stages:
+  - name: staging
+    validate: [health]
+    decision: { warning: ignore }

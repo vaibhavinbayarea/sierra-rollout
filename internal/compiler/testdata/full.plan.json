@@ -1,0 +1,647 @@
+{
+  "id": "ro/support-agent",
+  "agent": "support-agent",
+  "version": "v1.4.2",
+  "policy_hash": "6709997dd89a030b20e82191af1e87aa1c8884d03ef06823b8ea587d8215d7bc",
+  "pipelining": false,
+  "plugins": {
+    "eval-team/csat": {
+      "name": "eval-team/csat",
+      "kind": "validator",
+      "builtin": false,
+      "endpoint": "localhost:9000",
+      "timeout": 120000000000
+    },
+    "http-health": {
+      "name": "http-health",
+      "kind": "validator",
+      "builtin": true,
+      "timeout": 120000000000
+    },
+    "log-notifier": {
+      "name": "log-notifier",
+      "kind": "notifier",
+      "builtin": true,
+      "timeout": 30000000000
+    },
+    "manual-approval": {
+      "name": "manual-approval",
+      "kind": "validator",
+      "builtin": true,
+      "timeout": 120000000000
+    },
+    "mock-ramper": {
+      "name": "mock-ramper",
+      "kind": "ramper",
+      "builtin": true,
+      "timeout": 300000000000
+    },
+    "prometheus": {
+      "name": "prometheus",
+      "kind": "validator",
+      "builtin": true,
+      "timeout": 120000000000
+    }
+  },
+  "stages": [
+    {
+      "name": "staging",
+      "waves": [
+        {
+          "name": "default",
+          "max_parallel": 1,
+          "customers": [
+            {
+              "customer": "_",
+              "targets": [
+                {
+                  "id": "staging/default/_/us-east-1",
+                  "stage": "staging",
+                  "wave": "default",
+                  "customer": "_",
+                  "region": "us-east-1",
+                  "ramper": {
+                    "plugin": "mock-ramper",
+                    "params": {
+                      "service": "support-agent"
+                    }
+                  },
+                  "steps": [
+                    100
+                  ],
+                  "bake": 300000000000,
+                  "validations": [
+                    {
+                      "name": "health",
+                      "plugin": "http-health",
+                      "params": {
+                        "path": "/healthz"
+                      },
+                      "severity": "critical",
+                      "when": "every_step"
+                    }
+                  ],
+                  "decision": {
+                    "critical": "all_pass",
+                    "warning": "notify",
+                    "warning_notifier": "log-notifier",
+                    "inconclusive": {
+                      "retry": 3,
+                      "backoff": 60000000000,
+                      "then": "fail"
+                    }
+                  },
+                  "on_failure": [
+                    {
+                      "kind": "notify",
+                      "notifier": "log-notifier"
+                    },
+                    {
+                      "kind": "pause",
+                      "timeout": 86400000000000,
+                      "on_timeout": "hold"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "pre-prod",
+      "waves": [
+        {
+          "name": "default",
+          "max_parallel": 1,
+          "customers": [
+            {
+              "customer": "_",
+              "targets": [
+                {
+                  "id": "pre-prod/default/_/us-east-1",
+                  "stage": "pre-prod",
+                  "wave": "default",
+                  "customer": "_",
+                  "region": "us-east-1",
+                  "ramper": {
+                    "plugin": "mock-ramper",
+                    "params": {
+                      "service": "support-agent"
+                    }
+                  },
+                  "steps": [
+                    10,
+                    25,
+                    50,
+                    100
+                  ],
+                  "bake": 300000000000,
+                  "validations": [
+                    {
+                      "name": "health",
+                      "plugin": "http-health",
+                      "params": {
+                        "path": "/healthz"
+                      },
+                      "severity": "critical",
+                      "when": "every_step"
+                    },
+                    {
+                      "name": "error-rate",
+                      "plugin": "prometheus",
+                      "params": {
+                        "max": 0.01,
+                        "query": "rate(errors[5m])"
+                      },
+                      "severity": "critical",
+                      "when": "every_step"
+                    }
+                  ],
+                  "decision": {
+                    "critical": "all_pass",
+                    "warning": "notify",
+                    "warning_notifier": "log-notifier",
+                    "inconclusive": {
+                      "retry": 3,
+                      "backoff": 60000000000,
+                      "then": "fail"
+                    }
+                  },
+                  "on_failure": [
+                    {
+                      "kind": "notify",
+                      "notifier": "log-notifier"
+                    },
+                    {
+                      "kind": "pause",
+                      "timeout": 86400000000000,
+                      "on_timeout": "hold"
+                    }
+                  ]
+                },
+                {
+                  "id": "pre-prod/default/_/eu-west-1",
+                  "stage": "pre-prod",
+                  "wave": "default",
+                  "customer": "_",
+                  "region": "eu-west-1",
+                  "ramper": {
+                    "plugin": "mock-ramper",
+                    "params": {
+                      "service": "support-agent"
+                    }
+                  },
+                  "steps": [
+                    10,
+                    25,
+                    50,
+                    100
+                  ],
+                  "bake": 300000000000,
+                  "validations": [
+                    {
+                      "name": "health",
+                      "plugin": "http-health",
+                      "params": {
+                        "path": "/healthz"
+                      },
+                      "severity": "critical",
+                      "when": "every_step"
+                    },
+                    {
+                      "name": "error-rate",
+                      "plugin": "prometheus",
+                      "params": {
+                        "max": 0.01,
+                        "query": "rate(errors[5m])"
+                      },
+                      "severity": "critical",
+                      "when": "every_step"
+                    }
+                  ],
+                  "decision": {
+                    "critical": "all_pass",
+                    "warning": "notify",
+                    "warning_notifier": "log-notifier",
+                    "inconclusive": {
+                      "retry": 3,
+                      "backoff": 60000000000,
+                      "then": "fail"
+                    }
+                  },
+                  "on_failure": [
+                    {
+                      "kind": "notify",
+                      "notifier": "log-notifier"
+                    },
+                    {
+                      "kind": "pause",
+                      "timeout": 86400000000000,
+                      "on_timeout": "hold"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "prod",
+      "waves": [
+        {
+          "name": "canary",
+          "max_parallel": 1,
+          "customers": [
+            {
+              "customer": "acme",
+              "targets": [
+                {
+                  "id": "prod/canary/acme/us-east-1",
+                  "stage": "prod",
+                  "wave": "canary",
+                  "customer": "acme",
+                  "region": "us-east-1",
+                  "ramper": {
+                    "plugin": "mock-ramper",
+                    "params": {
+                      "service": "support-agent"
+                    }
+                  },
+                  "steps": [
+                    10,
+                    25,
+                    50,
+                    100
+                  ],
+                  "bake": 300000000000,
+                  "validations": [
+                    {
+                      "name": "health",
+                      "plugin": "http-health",
+                      "params": {
+                        "path": "/healthz"
+                      },
+                      "severity": "critical",
+                      "when": "every_step"
+                    },
+                    {
+                      "name": "error-rate",
+                      "plugin": "prometheus",
+                      "params": {
+                        "max": 0.01,
+                        "query": "rate(errors[5m])"
+                      },
+                      "severity": "critical",
+                      "when": "every_step"
+                    },
+                    {
+                      "name": "csat-drift",
+                      "plugin": "eval-team/csat",
+                      "severity": "warning",
+                      "when": "every_step"
+                    },
+                    {
+                      "name": "signoff",
+                      "plugin": "manual-approval",
+                      "severity": "critical",
+                      "when": "final_step"
+                    }
+                  ],
+                  "decision": {
+                    "critical": "all_pass",
+                    "warning": "notify",
+                    "warning_notifier": "log-notifier",
+                    "inconclusive": {
+                      "retry": 3,
+                      "backoff": 60000000000,
+                      "then": "fail"
+                    }
+                  },
+                  "on_failure": [
+                    {
+                      "kind": "notify",
+                      "notifier": "log-notifier"
+                    },
+                    {
+                      "kind": "pause",
+                      "timeout": 86400000000000,
+                      "on_timeout": "hold"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "broad",
+          "max_parallel": 2,
+          "customers": [
+            {
+              "customer": "globex",
+              "targets": [
+                {
+                  "id": "prod/broad/globex/us-east-1",
+                  "stage": "prod",
+                  "wave": "broad",
+                  "customer": "globex",
+                  "region": "us-east-1",
+                  "ramper": {
+                    "plugin": "mock-ramper",
+                    "params": {
+                      "service": "support-agent"
+                    }
+                  },
+                  "steps": [
+                    25,
+                    100
+                  ],
+                  "bake": 300000000000,
+                  "validations": [
+                    {
+                      "name": "health",
+                      "plugin": "http-health",
+                      "params": {
+                        "path": "/healthz"
+                      },
+                      "severity": "critical",
+                      "when": "every_step"
+                    },
+                    {
+                      "name": "error-rate",
+                      "plugin": "prometheus",
+                      "params": {
+                        "max": 0.01,
+                        "query": "rate(errors[5m])"
+                      },
+                      "severity": "critical",
+                      "when": "every_step"
+                    },
+                    {
+                      "name": "csat-drift",
+                      "plugin": "eval-team/csat",
+                      "severity": "warning",
+                      "when": "every_step"
+                    },
+                    {
+                      "name": "signoff",
+                      "plugin": "manual-approval",
+                      "severity": "critical",
+                      "when": "final_step"
+                    }
+                  ],
+                  "decision": {
+                    "critical": "all_pass",
+                    "warning": "notify",
+                    "warning_notifier": "log-notifier",
+                    "inconclusive": {
+                      "retry": 3,
+                      "backoff": 60000000000,
+                      "then": "fail"
+                    }
+                  },
+                  "on_failure": [
+                    {
+                      "kind": "notify",
+                      "notifier": "log-notifier"
+                    },
+                    {
+                      "kind": "pause",
+                      "timeout": 86400000000000,
+                      "on_timeout": "hold"
+                    }
+                  ]
+                },
+                {
+                  "id": "prod/broad/globex/eu-west-1",
+                  "stage": "prod",
+                  "wave": "broad",
+                  "customer": "globex",
+                  "region": "eu-west-1",
+                  "ramper": {
+                    "plugin": "mock-ramper",
+                    "params": {
+                      "service": "support-agent"
+                    }
+                  },
+                  "steps": [
+                    25,
+                    100
+                  ],
+                  "bake": 300000000000,
+                  "validations": [
+                    {
+                      "name": "health",
+                      "plugin": "http-health",
+                      "params": {
+                        "path": "/healthz"
+                      },
+                      "severity": "critical",
+                      "when": "every_step"
+                    },
+                    {
+                      "name": "error-rate",
+                      "plugin": "prometheus",
+                      "params": {
+                        "max": 0.01,
+                        "query": "rate(errors[5m])"
+                      },
+                      "severity": "critical",
+                      "when": "every_step"
+                    },
+                    {
+                      "name": "csat-drift",
+                      "plugin": "eval-team/csat",
+                      "severity": "warning",
+                      "when": "every_step"
+                    },
+                    {
+                      "name": "signoff",
+                      "plugin": "manual-approval",
+                      "severity": "critical",
+                      "when": "final_step"
+                    }
+                  ],
+                  "decision": {
+                    "critical": "all_pass",
+                    "warning": "notify",
+                    "warning_notifier": "log-notifier",
+                    "inconclusive": {
+                      "retry": 3,
+                      "backoff": 60000000000,
+                      "then": "fail"
+                    }
+                  },
+                  "on_failure": [
+                    {
+                      "kind": "notify",
+                      "notifier": "log-notifier"
+                    },
+                    {
+                      "kind": "pause",
+                      "timeout": 86400000000000,
+                      "on_timeout": "hold"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "customer": "initech",
+              "targets": [
+                {
+                  "id": "prod/broad/initech/us-east-1",
+                  "stage": "prod",
+                  "wave": "broad",
+                  "customer": "initech",
+                  "region": "us-east-1",
+                  "ramper": {
+                    "plugin": "mock-ramper",
+                    "params": {
+                      "service": "support-agent"
+                    }
+                  },
+                  "steps": [
+                    25,
+                    100
+                  ],
+                  "bake": 300000000000,
+                  "validations": [
+                    {
+                      "name": "health",
+                      "plugin": "http-health",
+                      "params": {
+                        "path": "/healthz"
+                      },
+                      "severity": "critical",
+                      "when": "every_step"
+                    },
+                    {
+                      "name": "error-rate",
+                      "plugin": "prometheus",
+                      "params": {
+                        "max": 0.01,
+                        "query": "rate(errors[5m])"
+                      },
+                      "severity": "critical",
+                      "when": "every_step"
+                    },
+                    {
+                      "name": "csat-drift",
+                      "plugin": "eval-team/csat",
+                      "severity": "warning",
+                      "when": "every_step"
+                    },
+                    {
+                      "name": "signoff",
+                      "plugin": "manual-approval",
+                      "severity": "critical",
+                      "when": "final_step"
+                    }
+                  ],
+                  "decision": {
+                    "critical": "all_pass",
+                    "warning": "notify",
+                    "warning_notifier": "log-notifier",
+                    "inconclusive": {
+                      "retry": 3,
+                      "backoff": 60000000000,
+                      "then": "fail"
+                    }
+                  },
+                  "on_failure": [
+                    {
+                      "kind": "notify",
+                      "notifier": "log-notifier"
+                    },
+                    {
+                      "kind": "pause",
+                      "timeout": 86400000000000,
+                      "on_timeout": "hold"
+                    }
+                  ]
+                },
+                {
+                  "id": "prod/broad/initech/eu-west-1",
+                  "stage": "prod",
+                  "wave": "broad",
+                  "customer": "initech",
+                  "region": "eu-west-1",
+                  "ramper": {
+                    "plugin": "mock-ramper",
+                    "params": {
+                      "service": "support-agent"
+                    }
+                  },
+                  "steps": [
+                    25,
+                    100
+                  ],
+                  "bake": 300000000000,
+                  "validations": [
+                    {
+                      "name": "health",
+                      "plugin": "http-health",
+                      "params": {
+                        "path": "/healthz"
+                      },
+                      "severity": "critical",
+                      "when": "every_step"
+                    },
+                    {
+                      "name": "error-rate",
+                      "plugin": "prometheus",
+                      "params": {
+                        "max": 0.01,
+                        "query": "rate(errors[5m])"
+                      },
+                      "severity": "critical",
+                      "when": "every_step"
+                    },
+                    {
+                      "name": "csat-drift",
+                      "plugin": "eval-team/csat",
+                      "severity": "warning",
+                      "when": "every_step"
+                    },
+                    {
+                      "name": "signoff",
+                      "plugin": "manual-approval",
+                      "severity": "critical",
+                      "when": "final_step"
+                    }
+                  ],
+                  "decision": {
+                    "critical": "all_pass",
+                    "warning": "notify",
+                    "warning_notifier": "log-notifier",
+                    "inconclusive": {
+                      "retry": 3,
+                      "backoff": 60000000000,
+                      "then": "fail"
+                    }
+                  },
+                  "on_failure": [
+                    {
+                      "kind": "notify",
+                      "notifier": "log-notifier"
+                    },
+                    {
+                      "kind": "pause",
+                      "timeout": 86400000000000,
+                      "on_timeout": "hold"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
