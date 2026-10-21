@@ -146,3 +146,19 @@ func TestIDs(t *testing.T) {
 		plan.TargetWorkflowID("ro/a", plan.TargetPlan{ID: "prod/broad/acme/us-east-1"}))
 	assert.True(t, strings.HasPrefix(compileFile(t, "staging-only.yaml").ID, "ro/solo/v1.4.2"))
 }
+
+func TestCompileRejectsBadVersion(t *testing.T) {
+	src, err := os.ReadFile("testdata/staging-only.yaml")
+	require.NoError(t, err)
+	for _, v := range []string{"stage/prod", "", "v 1", "../x"} {
+		p, diags := Compile(src, loadRegistry(t), v)
+		assert.Nil(t, p, v)
+		require.Len(t, diags, 1, v)
+		assert.Equal(t, "version", diags[0].Path)
+		assert.Contains(t, diags[0].Message, "invalid version")
+	}
+	for _, v := range []string{"v1.4.2", "1.0.0-rc.1", "2026.10.21+build.7", "abc123"} {
+		_, diags := Compile(src, loadRegistry(t), v)
+		assert.Empty(t, diags, v)
+	}
+}

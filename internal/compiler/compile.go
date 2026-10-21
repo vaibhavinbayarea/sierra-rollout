@@ -4,12 +4,16 @@ package compiler
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
+	"regexp"
 	"time"
 
 	"sierra-rollout/internal/plan"
 	"sierra-rollout/internal/registry"
 	"sierra-rollout/internal/spec"
 )
+
+var versionRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+-]*$`)
 
 var kindTimeouts = map[registry.Kind]time.Duration{
 	registry.KindRamper:    5 * time.Minute,
@@ -20,6 +24,11 @@ var kindTimeouts = map[registry.Kind]time.Duration{
 // Compile parses, checks and resolves a policy. It returns either a plan or
 // diagnostics, never both.
 func Compile(policy []byte, reg *registry.Registry, version string) (*plan.Plan, []spec.Diagnostic) {
+	// The version becomes part of workflow IDs; '/' could collide with a
+	// stage lock ID.
+	if !versionRe.MatchString(version) {
+		return nil, []spec.Diagnostic{{Path: "version", Message: fmt.Sprintf("invalid version %q (use letters, digits, '.', '_', '+', '-')", version)}}
+	}
 	p, lines, diags := spec.Parse(policy)
 	if len(diags) > 0 {
 		return nil, diags
