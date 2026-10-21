@@ -1,0 +1,27 @@
+# Quick start policy: see docs/quickstart.md.
+apiVersion: rollout/v1
+agent: my-agent
+ramper: { plugin: mock-ramper }        # built-in stub; a real team plugs in its own ramper
+
+defaults:
+  steps: [25, 100]                     # ramp to 25%, then 100%
+  bake: 5s                             # wait after each ramp before validating
+  on_failure:
+    - { notify: log-notifier }
+    - { pause: { timeout: 1h, on_timeout: hold } }
+
+validations:
+  health:     { plugin: http-health, params: { path: /healthz } }
+  error-rate: { plugin: prometheus, params: { query: 'rate(errors[5m])', max: 0.01 } }
+  signoff:    { plugin: manual-approval, when: final_step, params: { message: "ship to acme?" } }
+
+stages:
+  - name: staging
+    regions: [us-east-1]
+    steps: [100]
+    validate: [health]
+  - name: prod
+    validate: [health, error-rate]
+    waves:
+      - { name: canary, customers: [acme], regions: [us-east-1], validate: [health, error-rate, signoff] }
+      - { name: broad, customers: [globex], regions: [us-east-1, eu-west-1] }

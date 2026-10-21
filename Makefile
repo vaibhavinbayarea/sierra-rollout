@@ -1,4 +1,4 @@
-.PHONY: test lint proto build integration e2e dev-temporal
+.PHONY: test lint proto build integration e2e dev-temporal dev
 
 test:
 	go test ./...
@@ -20,3 +20,6 @@ e2e:
 
 dev-temporal:
 	temporal server start-dev
+
+dev:
+	./scripts/dev.sh
