@@ -212,6 +212,13 @@ Check it with `rolloutctl plan -f policy.yaml --version v1`. Unknown
 plugin names, the wrong kind (for example a notifier used as a validator)
 and invalid params are all reported with the YAML line.
 
+## Validation packs (proposed)
+
+If your team provides something others depend on, such as an SDK, and you
+want every dependent rollout to run your checks, see
+[validation packs](validation-packs.md). That design is not implemented
+yet.
+
 ## Built-in plugins
 
 | Name | Kind | v1 behaviour |

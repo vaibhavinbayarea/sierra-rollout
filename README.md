@@ -115,6 +115,7 @@ The full schema is in the [developer guide](docs/developer-guide.md#policy-refer
 - [Quick start](docs/quickstart.md): first rollout in ten minutes
 - [Architecture](docs/architecture.md): components, workflow hierarchy, state machine, diagrams
 - [Developer guide](docs/developer-guide.md): building, testing, code layout, policy reference, API
+- [Validation packs (proposed)](docs/validation-packs.md): mandatory checks a provider team (e.g. the SDK) requires its dependents to run
 - [Plugin guide](docs/plugins.md): writing a ramper, validator or notifier, and registering it
 - [Contributing](CONTRIBUTING.md): how to propose changes
 - [Design spec](docs/superpowers/specs/2026-10-21-agent-rollout-service-design.md)
