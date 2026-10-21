@@ -24,8 +24,15 @@ import (
 	"go.temporal.io/sdk/testsuite"
 	"google.golang.org/protobuf/encoding/protojson"
 
+	"go.temporal.io/sdk/worker"
+
+	"sierra-rollout/internal/activities"
 	"sierra-rollout/internal/api"
 	"sierra-rollout/internal/cli"
+	"sierra-rollout/internal/compiler"
+	"sierra-rollout/internal/plan"
+	"sierra-rollout/internal/plugin"
+	"sierra-rollout/internal/plugin/builtin"
 	"sierra-rollout/internal/registry"
 	"sierra-rollout/internal/workflows"
 )
@@ -238,5 +245,62 @@ func recordHistories(t *testing.T, ids ...string) {
 		require.NoError(t, err)
 		name := strings.ReplaceAll(id, "/", "_") + ".json"
 		require.NoError(t, os.WriteFile(filepath.Join(dir, name), b, 0o644))
+	}
+}
+
+// failCustomer is an http-health stand-in that fails one customer.
+type failCustomer string
+
+func (f failCustomer) Validate(_ context.Context, r plugin.ValidateRequest) (plan.Verdict, error) {
+	if r.Target.Customer == string(f) {
+		return plan.Verdict{Outcome: plan.FAIL, Summary: "forced"}, nil
+	}
+	return plan.Verdict{Outcome: plan.PASS}, nil
+}
+
+// TestHeldStopsSiblings holds customer a while b and c are mid-rollout, so
+// the stage sends stop to two running siblings. Its stage history backs
+// the replay test for deterministic signal order.
+func TestHeldStopsSiblings(t *testing.T) {
+	const queue = "rollout-siblings"
+	reg, err := registry.Load("../../plugins.yaml")
+	require.NoError(t, err)
+	builtins := builtin.Register()
+	builtins["http-health"] = failCustomer("a")
+	set, err := plugin.NewSet(reg, builtins, func(registry.Entry) (any, error) { return builtin.Register()["prometheus"], nil })
+	require.NoError(t, err)
+	w := worker.New(temporal, queue, worker.Options{})
+	workflows.Register(w, &activities.Activities{Plugins: set})
+	require.NoError(t, w.Start())
+	defer w.Stop()
+
+	p, diags := compiler.Compile([]byte(`apiVersion: rollout/v1
+agent: siblings
+ramper: { plugin: mock-ramper }
+validations:
+  health: { plugin: http-health, params: { path: /h } }
+stages:
+  - name: prod
+    regions: [us-east-1]
+    steps: [25, 50, 100]
+    bake: 2s
+    validate: [health]
+    on_failure: [hold]
+    waves:
+      - { name: w, customers: [a, b, c], max_parallel: 3 }
+`), reg, "v1")
+	require.Empty(t, diags)
+	run, err := temporal.ExecuteWorkflow(context.Background(), client.StartWorkflowOptions{ID: p.ID, TaskQueue: queue}, workflows.GlobalRollout, *p)
+	require.NoError(t, err)
+	var st workflows.RolloutStatus
+	require.NoError(t, run.Get(context.Background(), &st))
+	assert.Equal(t, workflows.Held, st.State)
+	for _, c := range []string{"b", "c"} {
+		ts := st.Targets["prod/w/"+c+"/us-east-1"]
+		assert.Equal(t, workflows.StateHeld, ts.State, c)
+		assert.Contains(t, ts.Message, "sibling", c)
+	}
+	if *record {
+		recordHistories(t, "ro/siblings/stage/prod")
 	}
 }

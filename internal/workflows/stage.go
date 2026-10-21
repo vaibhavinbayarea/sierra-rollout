@@ -1,6 +1,9 @@
 package workflows
 
 import (
+	"maps"
+	"slices"
+
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/workflow"
 
@@ -36,8 +39,9 @@ func StageRollout(ctx workflow.Context, in StageInput) (StageResult, error) {
 		}
 		stopping = true
 		res.Message = t.ID + ": " + tr.Message
-		for _, f := range running {
-			f.SignalChildWorkflow(ctx, SignalStop, nil)
+		// Sorted: issuing commands in map order would be nondeterministic.
+		for _, id := range slices.Sorted(maps.Keys(running)) {
+			running[id].SignalChildWorkflow(ctx, SignalStop, nil)
 		}
 	}
 

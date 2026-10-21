@@ -32,7 +32,9 @@ type harness struct {
 	progress  []TargetStatus
 }
 
-func pass(activities.ValidateInput) (plan.Verdict, error) { return plan.Verdict{Outcome: plan.PASS}, nil }
+func pass(activities.ValidateInput) (plan.Verdict, error) {
+	return plan.Verdict{Outcome: plan.PASS}, nil
+}
 
 func newHarness(t *testing.T, validate validateFn) *harness {
 	h := newEnv(t, validate)
