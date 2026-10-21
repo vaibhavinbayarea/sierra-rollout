@@ -1,0 +1,12 @@
+ro/support-agent  v1.4.2  running
+staging
+  default
+    _
+      us-east-1    succeeded          step 1/1 @ 100%
+prod
+  canary
+    acme
+      us-east-1    awaiting_approval  step 4/4 @ 100%  awaiting: signoff
+  broad
+    globex
+      us-east-1    paused             step 1/2 @ 25%  failed: error-rate
