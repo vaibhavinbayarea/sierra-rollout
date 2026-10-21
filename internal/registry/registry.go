@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
@@ -150,6 +151,16 @@ func compileSchema(name string, raw []byte) (*jsonschema.Schema, error) {
 		return nil, err
 	}
 	return c.Compile(url)
+}
+
+// Entries returns all entries sorted by name.
+func (r *Registry) Entries() []Entry {
+	out := make([]Entry, 0, len(r.entries))
+	for _, e := range r.entries {
+		out = append(out, e)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
 }
 
 func (r *Registry) Get(name string) (Entry, bool) {
