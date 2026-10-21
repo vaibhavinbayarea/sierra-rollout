@@ -52,3 +52,23 @@ func Worst(a, b string) string {
 	}
 	return a
 }
+
+// QueryStatus is the GlobalRollout query returning RolloutStatus.
+const QueryStatus = "status"
+
+// Rollout-level states besides the terminal statuses.
+const (
+	StateRunning         = "running"
+	StateWaitingForStage = "waiting_for_stage"
+)
+
+type RolloutStatus struct {
+	ID              string                  `json:"id"`
+	Agent           string                  `json:"agent"`
+	Version         string                  `json:"version"`
+	State           string                  `json:"state"` // running | waiting_for_stage | SUCCEEDED | HELD | ABORTED
+	WaitingForStage string                  `json:"waiting_for_stage,omitempty"`
+	Order           []string                `json:"order"`
+	Targets         map[string]TargetStatus `json:"targets"`
+	Message         string                  `json:"message,omitempty"`
+}

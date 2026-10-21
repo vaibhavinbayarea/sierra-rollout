@@ -25,6 +25,8 @@ type harness struct {
 	env       *testsuite.TestWorkflowEnvironment
 	mu        sync.Mutex
 	ramps     []activities.RampInput
+	rampTimes []time.Time
+	rampErr   func(activities.RampInput) error
 	validates []activities.ValidateInput
 	notifies  []string
 	progress  []TargetStatus
@@ -33,15 +35,35 @@ type harness struct {
 func pass(activities.ValidateInput) (plan.Verdict, error) { return plan.Verdict{Outcome: plan.PASS}, nil }
 
 func newHarness(t *testing.T, validate validateFn) *harness {
+	h := newEnv(t, validate)
+	h.env.OnSignalExternalWorkflow(mock.Anything, "ro/a", "", SignalProgress, mock.Anything).Run(func(args mock.Arguments) {
+		h.mu.Lock()
+		defer h.mu.Unlock()
+		h.progress = append(h.progress, args.Get(4).(TargetStatus))
+	}).Return(nil)
+	return h
+}
+
+// newEnv registers all workflows with recording activity mocks; progress
+// signals are delivered for real.
+func newEnv(t *testing.T, validate validateFn) *harness {
 	h := &harness{t: t}
 	var s testsuite.WorkflowTestSuite
 	h.env = s.NewTestWorkflowEnvironment()
 	h.env.RegisterWorkflow(TargetRollout)
+	h.env.RegisterWorkflow(StageRollout)
+	h.env.RegisterWorkflow(GlobalRollout)
 	h.env.RegisterActivity(&activities.Activities{})
 	h.env.OnActivity("Ramp", mock.Anything, mock.Anything).Return(func(_ context.Context, in activities.RampInput) error {
 		h.mu.Lock()
 		defer h.mu.Unlock()
+		if h.rampErr != nil {
+			if err := h.rampErr(in); err != nil {
+				return err
+			}
+		}
 		h.ramps = append(h.ramps, in)
+		h.rampTimes = append(h.rampTimes, h.env.Now())
 		return nil
 	})
 	h.env.OnActivity("Validate", mock.Anything, mock.Anything).Return(func(_ context.Context, in activities.ValidateInput) (plan.Verdict, error) {
@@ -59,11 +81,6 @@ func newHarness(t *testing.T, validate validateFn) *harness {
 		h.notifies = append(h.notifies, in.Event.Kind)
 		return nil
 	})
-	h.env.OnSignalExternalWorkflow(mock.Anything, "ro/a", "", SignalProgress, mock.Anything).Run(func(args mock.Arguments) {
-		h.mu.Lock()
-		defer h.mu.Unlock()
-		h.progress = append(h.progress, args.Get(4).(TargetStatus))
-	}).Return(nil)
 	return h
 }
 
