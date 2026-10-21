@@ -93,13 +93,15 @@ setup() {
     say "using Temporal already running on :7233"
   else
     say "starting Temporal dev server (UI: http://localhost:8233)"
-    "$TEMPORAL" server start-dev --headless --log-level error >"$LOGS/temporal.log" 2>&1 & PIDS+=($!)
+    "$TEMPORAL" server start-dev --log-level error >"$LOGS/temporal.log" 2>&1 & PIDS+=($!)
     until port_open 7233; do sleep 0.5; done
   fi
   "$ROOT/bin/worker" --registry "$DEMO/plugins.yaml" >"$LOGS/worker.log" 2>&1 & PIDS+=($!)
   "$ROOT/bin/server" --registry "$DEMO/plugins.yaml" >"$LOGS/server.log" 2>&1 & PIDS+=($!)
   until port_open 8080; do sleep 0.5; done
-  say "worker + API up (logs: demo/.logs/). Watch workflows in the Temporal UI: http://localhost:8233"
+  say "worker + API up (logs: demo/.logs/)."
+  say "Live dashboard: $ROLLOUT_SERVER/ui   ·   Temporal UI: http://localhost:8233"
+  [[ "${DEMO_AUTO:-}" == 1 || "${DEMO_OPEN:-1}" == 0 ]] || open "$ROLLOUT_SERVER/ui" 2>/dev/null || true
 }
 
 # ---------- acts ----------
@@ -190,7 +192,7 @@ main() {
   setup
   for a in "${acts[@]}"; do "act$a"; done
   act "Done"
-  say "Temporal UI: http://localhost:8233 — each rollout is a GlobalRollout → StageRollout → TargetRollout tree."
+  say "Dashboard: $ROLLOUT_SERVER/ui · Temporal UI: http://localhost:8233 (GlobalRollout → StageRollout → TargetRollout)."
 }
 
 main "$@"

@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rollout Dashboard</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --ink: #1d2330; --muted: #6b7385; --line: #e3e6ec;
+    --pending: #c3c8d2; --active: #3b82f6; --validate: #7c5cff; --wait: #f59e0b;
+    --bad: #ef4444; --good: #16a34a; --flash: #fff6d6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #11141a; --panel: #1a1f28; --ink: #e6e9ef; --muted: #8b93a5; --line: #2a303c;
+      --pending: #3a414f; --flash: #3a3420;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  header { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel); position: sticky; top: 0; z-index: 1; }
+  header h1 { font-size: 17px; margin: 0; }
+  .live { width: 8px; height: 8px; border-radius: 50%; background: var(--good); animation: pulse 1.2s infinite; }
+  .live.down { background: var(--bad); animation: none; }
+  @keyframes pulse { 50% { opacity: .3; } }
+  .hint { color: var(--muted); font-size: 12px; margin-left: auto; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; padding: 16px 20px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; padding: 12px 16px; } }
+  .rollout { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; margin-bottom: 14px; overflow: hidden; }
+  .rhead { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  .rhead .id { font-weight: 600; font-size: 15px; }
+  .rhead .ver { color: var(--muted); }
+  .rhead .msg { color: var(--muted); font-size: 12px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pipeline { display: flex; align-items: stretch; gap: 0; padding: 12px; overflow-x: auto; }
+  .stage { flex: 1 1 0; min-width: 210px; border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+  .stage.done { border-color: var(--good); }
+  .stage.active { border-color: var(--active); box-shadow: 0 0 0 2px color-mix(in srgb, var(--active) 25%, transparent); }
+  .stage.problem { border-color: var(--bad); box-shadow: 0 0 0 2px color-mix(in srgb, var(--bad) 25%, transparent); }
+  .arrow { align-self: center; color: var(--muted); padding: 0 6px; font-size: 18px; }
+  .sname { display: flex; justify-content: space-between; font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: .06em; margin-bottom: 6px; }
+  .wave { color: var(--muted); font-size: 11px; margin: 6px 0 2px; }
+  .cust { font-size: 12px; font-weight: 600; margin: 4px 0 2px; }
+  .target { border-radius: 6px; padding: 5px 6px; margin: 3px 0; }
+  .target.flash { background: var(--flash); }
+  .trow { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+  .trow .region { width: 74px; flex: none; }
+  .bar { flex: 1; height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; width: 0; background: var(--pending); transition: width .7s ease, background .3s; }
+  .pct { width: 36px; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 11px; font-weight: 600; color: #fff; background: var(--pending); white-space: nowrap; }
+  .tmeta { display: flex; align-items: center; gap: 6px; margin-top: 3px; font-size: 11px; color: var(--muted); }
+  .tmeta .why { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .s-pending, .s-skipped { --c: var(--pending); }
+  .s-ramping, .s-baking, .s-running { --c: var(--active); }
+  .s-validating, .s-retrying { --c: var(--validate); }
+  .s-awaiting_approval, .s-waiting_for_stage { --c: var(--wait); }
+  .s-paused, .s-held, .s-aborted, .s-HELD, .s-ABORTED { --c: var(--bad); }
+  .s-succeeded, .s-SUCCEEDED { --c: var(--good); }
+  .badge[class*="s-"] { background: var(--c); }
+  .bar > i[class*="s-"] { background: var(--c); }
+  .s-skipped .bar > i, .badge.s-skipped { opacity: .6; }
+  button { font: inherit; font-size: 11px; padding: 2px 8px; border-radius: 5px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+  button.go { border-color: var(--good); color: var(--good); }
+  button.stop { border-color: var(--bad); color: var(--bad); }
+  aside { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; align-self: start; position: sticky; top: 64px; max-height: calc(100vh - 84px); overflow: auto; }
+  aside h2 { font-size: 13px; margin: 0 0 8px; }
+  .ev { font-size: 12px; padding: 4px 0; border-bottom: 1px dashed var(--line); }
+  .ev time { color: var(--muted); font-variant-numeric: tabular-nums; margin-right: 6px; }
+  .empty { color: var(--muted); padding: 40px; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <span class="live" id="live"></span>
+  <h1>Rollouts</h1>
+  <span class="hint">live · polls /v1/rollouts every second · newest first</span>
+</header>
+<main>
+  <section id="rollouts"><div class="empty">Waiting for rollouts…</div></section>
+  <aside><h2>Recent changes</h2><div id="feed"></div></aside>
+</main>
+<script>
+const MAX_ROLLOUTS = 6;
+const prev = {};      // rollout id -> target id -> state
+const events = [];    // newest first
+const flashUntil = {}; // rollout/target key -> ms timestamp
+const enc = encodeURIComponent;
+
+async function getJSON(url, opts) {
+  const r = await fetch(url, opts);
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.status);
+  return r.json();
+}
+
+async function signal(id, tid, sig) {
+  try {
+    if (tid) await getJSON(`/v1/rollouts/${enc(id)}/targets/${enc(tid)}/signal`, { method: 'POST', body: JSON.stringify({ signal: sig }) });
+    else await getJSON(`/v1/rollouts/${enc(id)}/abort`, { method: 'POST' });
+  } catch (e) { alert(`${sig} failed: ${e.message}`); }
+  tick();
+}
+
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]); }
+function label(s) { return s.replace(/_/g, ' '); }
+
+function stageClass(targets) {
+  const st = targets.map(t => t.state);
+  if (st.some(s => ['paused', 'held', 'aborted'].includes(s))) return 'problem';
+  if (st.every(s => s === 'succeeded')) return 'done';
+  if (st.some(s => !['pending', 'skipped', 'succeeded'].includes(s))) return 'active';
+  return '';
+}
+
+function recordChanges(st) {
+  const before = prev[st.id] || {};
+  const now = {};
+  for (const tid of st.order) {
+    const t = st.targets[tid];
+    now[tid] = t.state;
+    if (before[tid] && before[tid] !== t.state) {
+      events.unshift({ at: new Date(), text: `${st.id.replace(/^ro\//, '')} · ${tid.replace('/default/', '/').replace('/_/', '/')}: ${label(before[tid])} → ${label(t.state)}${t.percent ? ` @ ${t.percent}%` : ''}`, state: t.state });
+    }
+  }
+  if (before.__state && before.__state !== st.state) events.unshift({ at: new Date(), text: `${st.id} is ${st.state}`, state: st.state });
+  now.__state = st.state;
+  for (const k of Object.keys(now)) if (before[k] !== undefined && before[k] !== now[k]) flashUntil[st.id + '|' + k] = Date.now() + 2500;
+  const changed = new Set(Object.keys(now).filter(k => (flashUntil[st.id + '|' + k] || 0) > Date.now()));
+  prev[st.id] = now;
+  events.length = Math.min(events.length, 60);
+  return changed;
+}
+
+function renderTarget(st, tid, changed) {
+  const t = st.targets[tid];
+  const actions = [];
+  if (t.state === 'awaiting_approval') actions.push(`<button class="go" onclick="signal('${esc(st.id)}','${esc(tid)}','approve')">Approve</button>`);
+  if (t.state === 'paused') actions.push(`<button class="go" onclick="signal('${esc(st.id)}','${esc(tid)}','retry')">Retry</button>`, `<button class="stop" onclick="signal('${esc(st.id)}','${esc(tid)}','abort')">Abort</button>`);
+  const why = t.awaiting_approval?.length ? `awaiting: ${t.awaiting_approval.join(', ')}` : (t.message || '');
+  return `<div class="target s-${t.state} ${changed.has(tid) ? 'flash' : ''}" data-tid="${esc(tid)}">
+    <div class="trow"><span class="region">${esc(t.region)}</span>
+      <span class="bar"><i class="s-${t.state}" style="width:${t.percent || 0}%"></i></span>
+      <span class="pct">${t.percent || 0}%</span></div>
+    <div class="tmeta"><span class="badge s-${t.state}">${label(t.state)}</span>
+      <span>step ${t.step || 0}/${t.steps || 0}</span><span class="why" title="${esc(why)}">${esc(why)}</span>${actions.join('')}</div>
+  </div>`;
+}
+
+function renderRollout(st, changed) {
+  const stages = [];
+  for (const tid of st.order) {
+    const t = st.targets[tid];
+    let s = stages.find(x => x.name === t.stage);
+    if (!s) stages.push(s = { name: t.stage, ids: [] });
+    s.ids.push(tid);
+  }
+  const cols = stages.map(s => {
+    let html = '', wave = null, cust = null;
+    for (const tid of s.ids) {
+      const t = st.targets[tid];
+      if (t.wave !== wave) { wave = t.wave; cust = null; if (wave !== 'default') html += `<div class="wave">wave · ${esc(wave)}</div>`; }
+      if (t.customer !== cust) { cust = t.customer; if (cust !== '_') html += `<div class="cust">${esc(cust)}</div>`; }
+      html += renderTarget(st, tid, changed);
+    }
+    const ts = s.ids.map(id => st.targets[id]);
+    const done = ts.filter(t => t.state === 'succeeded').length;
+    return `<div class="stage ${stageClass(ts)}"><div class="sname"><span>${esc(s.name)}</span><span>${done}/${ts.length}</span></div>${html}</div>`;
+  }).join('<div class="arrow">→</div>');
+  const running = !['SUCCEEDED', 'HELD', 'ABORTED'].includes(st.state);
+  const extra = st.waiting_for_stage ? ` (stage ${esc(st.waiting_for_stage)} busy)` : '';
+  return `<div class="rollout"><div class="rhead">
+      <span class="id">${esc(st.id)}</span><span class="ver">${esc(st.version)}</span>
+      <span class="badge s-${st.state}">${label(st.state)}${extra}</span>
+      <span class="msg" title="${esc(st.message)}">${esc(st.message)}</span>
+      ${running ? `<button class="stop" onclick="if(confirm('Abort ${esc(st.id)}?'))signal('${esc(st.id)}',null,'abort')">Abort rollout</button>` : ''}
+    </div><div class="pipeline">${cols}</div></div>`;
+}
+
+async function tick() {
+  try {
+    const list = (await getJSON('/v1/rollouts')).slice(0, MAX_ROLLOUTS);
+    const statuses = (await Promise.all(list.map(r => getJSON(`/v1/rollouts/${enc(r.id)}`).catch(() => null)))).filter(Boolean);
+    document.getElementById('rollouts').innerHTML = statuses.length
+      ? statuses.map(st => renderRollout(st, recordChanges(st))).join('')
+      : '<div class="empty">No rollouts yet. Start one with <code>rolloutctl start</code>.</div>';
+    document.getElementById('feed').innerHTML = events.map(e =>
+      `<div class="ev"><time>${e.at.toLocaleTimeString()}</time><span class="badge s-${e.state}">${label(e.state)}</span> ${esc(e.text)}</div>`).join('');
+    document.getElementById('live').classList.remove('down');
+  } catch (e) {
+    document.getElementById('live').classList.add('down');
+  }
+}
+
+tick();
+setInterval(tick, 1000);
+</script>
+</body>
+</html>

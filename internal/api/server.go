@@ -26,6 +26,8 @@ func NewServer(c client.Client, reg *registry.Registry, taskQueue string) http.H
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /v1/plans", s.plan)
 	mux.HandleFunc("POST /v1/rollouts", s.start)
+	mux.HandleFunc("GET /v1/rollouts", s.listRollouts)
+	mux.HandleFunc("GET /ui", s.ui)
 	mux.HandleFunc("GET /v1/rollouts/{id}", s.status)
 	mux.HandleFunc("POST /v1/rollouts/{id}/targets/{tid}/signal", s.signal)
 	mux.HandleFunc("POST /v1/rollouts/{id}/abort", s.abort)
