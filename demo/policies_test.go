@@ -29,7 +29,11 @@ func TestDemoPoliciesCompile(t *testing.T) {
 			require.NoError(t, err)
 			p, diags := compiler.Compile(src, reg, "v1")
 			require.Empty(t, diags)
-			assert.Len(t, p.Targets(), 8)
+			want := 8
+			if filepath.Base(f) == "agent-foobar.yaml" {
+				want = 13 // 8 live + 5 prod-dark targets
+			}
+			assert.Len(t, p.Targets(), want)
 		})
 	}
 }

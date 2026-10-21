@@ -16,6 +16,9 @@ policy.yaml ──rolloutctl──▶ API ──compile──▶ plan ──▶ 
 
 ## Getting started
 
+New here? The [quick start](docs/quickstart.md) takes you from clone to a
+finished rollout, with a failure and a dark canary, in about ten minutes.
+
 Requirements: Go 1.24 and the Temporal CLI (`brew install temporal`).
 
 ```sh
@@ -49,8 +52,13 @@ bin/rolloutctl start -f examples/policy-failing.yaml --version v2
 bin/rolloutctl retry ro/support-agent --target pre-prod/default/_/us-east-1
 ```
 
-For a guided tour of multi-team rollouts, failures and guardrails, run
-`demo/demo.sh` (`DEMO_AUTO=1` skips the pauses).
+To watch rollouts move stage by stage, open the live dashboard at
+<http://127.0.0.1:8080/ui>. It shows each rollout as a pipeline with ramp
+bars, highlights state changes, and has Approve / Retry / Abort buttons.
+
+For a guided tour of multi-team rollouts, a prod dark canary, failures and
+guardrails, run `demo/demo.sh` (`DEMO_AUTO=1` skips the pauses). It opens
+the dashboard for you.
 
 ## rolloutctl
 
@@ -90,10 +98,21 @@ stages:
       - { name: broad, customers: [globex, initech], max_parallel: 2, regions: [us-east-1, eu-west-1] }
 ```
 
+To put a **dark canary** in front of an environment, add a `dark:` block to
+its stage. Before any live prod traffic, every prod target first receives
+mirrored traffic (responses discarded), which is validated and then torn
+down:
+
+```yaml
+  - name: prod
+    dark: { mirror: [50, 100], validate: [error-rate] }
+```
+
 The full schema is in the [developer guide](docs/developer-guide.md#policy-reference).
 
 ## Documentation
 
+- [Quick start](docs/quickstart.md): first rollout in ten minutes
 - [Architecture](docs/architecture.md): components, workflow hierarchy, state machine, diagrams
 - [Developer guide](docs/developer-guide.md): building, testing, code layout, policy reference, API
 - [Plugin guide](docs/plugins.md): writing a ramper, validator or notifier, and registering it

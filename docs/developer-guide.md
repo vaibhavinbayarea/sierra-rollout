@@ -130,12 +130,27 @@ validations:
 stages:                                # run in order
   - name: <name>
     <overrides>
+    dark:                              # optional dark canary gate, run before this stage
+      mirror: [10, 100]                # % of traffic mirrored; default [100]
+      validate: [<validation>, ...]    # required, at least one
+      bake: / decision: / on_failure: / ramper:   # optional; default to the stage's values
     waves:                             # optional; run in order
       - name: <name>
         customers: [a, b]              # in parallel, up to max_parallel
         max_parallel: 1
         <overrides>
 ```
+
+- **Dark canary (`dark:`):** the compiler inserts a `<stage>-dark` stage
+  just before the stage. It holds one target per live target of the stage
+  (every wave, customer and region), and they all run at once in shadow
+  mode: the ramper mirrors real traffic to the new version and discards
+  its responses. Validations, decision and failure policy work as usual.
+  Mirroring is always set back to 0% when the dark phase ends, whether it
+  passed, was held or was aborted. If any dark target doesn't succeed, the
+  rollout stops and the stage's live targets end `skipped`. Dark target IDs
+  are `<stage>-dark/<wave>/<customer>/<region>`. The resolved ramper must
+  list `shadow` in its registry `modes`, or `plan` fails.
 
 - **Precedence:** wave, then stage, then `defaults`, then the built-in
   defaults. For `decision`, each field resolves separately.

@@ -19,10 +19,12 @@ var update = flag.Bool("update", false, "rewrite golden files")
 func TestRenderStatusGolden(t *testing.T) {
 	st := &workflows.RolloutStatus{
 		ID: "ro/support-agent", Version: "v1.4.2", State: workflows.StateRunning,
-		Order: []string{"staging/default/_/us-east-1", "prod/canary/acme/us-east-1", "prod/broad/globex/us-east-1"},
+		Order: []string{"staging/default/_/us-east-1", "prod-dark/canary/acme/us-east-1", "prod/canary/acme/us-east-1", "prod/broad/globex/us-east-1"},
 		Targets: map[string]workflows.TargetStatus{
 			"staging/default/_/us-east-1": {Stage: "staging", Wave: "default", Customer: "_", Region: "us-east-1",
 				State: workflows.StateSucceeded, Step: 1, Steps: 1, Percent: 100},
+			"prod-dark/canary/acme/us-east-1": {Stage: "prod-dark", Wave: "canary", Customer: "acme", Region: "us-east-1", Mode: "dark",
+				State: workflows.StateBaking, Step: 1, Steps: 2, Percent: 50},
 			"prod/canary/acme/us-east-1": {Stage: "prod", Wave: "canary", Customer: "acme", Region: "us-east-1",
 				State: workflows.StateAwaitingApproval, Step: 4, Steps: 4, Percent: 100, AwaitingApproval: []string{"signoff"}},
 			"prod/broad/globex/us-east-1": {Stage: "prod", Wave: "broad", Customer: "globex", Region: "us-east-1",
@@ -41,6 +43,7 @@ func TestRenderStatusGolden(t *testing.T) {
 	assert.Equal(t, string(want), buf.String())
 	assert.Contains(t, buf.String(), "awaiting: signoff")
 	assert.Contains(t, buf.String(), "step 1/2 @ 25%")
+	assert.Contains(t, buf.String(), "step 1/2 @ 50% mirrored")
 }
 
 func TestRenderDiagnostics(t *testing.T) {

@@ -68,6 +68,9 @@ func RenderStatus(w io.Writer, st *workflows.RolloutStatus) {
 			fmt.Fprintf(w, "    %s\n", customer)
 		}
 		line := fmt.Sprintf("      %-12s %-18s step %d/%d @ %d%%", t.Region, t.State, t.Step, t.Steps, t.Percent)
+		if t.Mode == "dark" {
+			line += " mirrored"
+		}
 		if len(t.AwaitingApproval) > 0 {
 			line += "  awaiting: " + strings.Join(t.AwaitingApproval, ", ")
 		}

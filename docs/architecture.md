@@ -63,6 +63,20 @@ byte-identical JSON.
 Stages without `waves` compile to one implicit wave named `default`, with
 customer `_`. Target IDs have the form `<stage>/<wave>/<customer>/<region>`.
 
+A stage with a `dark:` block also produces a `<stage>-dark` stage, placed
+right before it:
+
+```mermaid
+flowchart LR
+    s[staging] --> pp[pre-prod] --> pd["prod-dark<br/>every prod target in parallel,<br/>shadow mode: mirrored traffic,<br/>responses discarded"]
+    pd -->|all dark targets succeeded;<br/>mirroring torn down| p[prod<br/>live waves]
+    pd -.->|any dark target held/aborted| x[rollout stops<br/>prod targets skipped]
+```
+
+Dark targets are ordinary `TargetRollout`s with `mode: dark`: each step
+sets the mirrored percentage through `Ramper.SetPercent(mode=shadow)`, and
+the target always sets shadow back to 0% before it ends.
+
 ## Workflow hierarchy
 
 ```mermaid

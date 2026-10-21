@@ -115,6 +115,7 @@ act1() {
   pause
   run "$R" start -f "$DEMO/policies/agent-foobar.yaml" --version v1.0.0
   say "Each target ramps 10% → 50% → 100%, baking and validating after every step."
+  say "Before any customer sees prod, prod-dark mirrors real traffic to v1 for every prod target (responses discarded), validates it, then tears mirroring down."
   wait_until ro/agent-foobar awaiting_approval 180
   run "$R" status ro/agent-foobar
   say "The prod canary waits for a human. Approve the sign-off:"

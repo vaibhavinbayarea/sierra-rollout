@@ -59,6 +59,9 @@
   .badge[class*="s-"] { background: var(--c); }
   .bar > i[class*="s-"] { background: var(--c); }
   .s-skipped .bar > i, .badge.s-skipped { opacity: .6; }
+  .target.dark .bar > i { background: repeating-linear-gradient(45deg, var(--validate) 0 6px, color-mix(in srgb, var(--validate) 55%, transparent) 6px 12px); }
+  .stage.darkstage { border-style: dashed; }
+  .mirror { font-size: 10px; color: var(--validate); font-weight: 600; }
   button { font: inherit; font-size: 11px; padding: 2px 8px; border-radius: 5px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
   button.go { border-color: var(--good); color: var(--good); }
   button.stop { border-color: var(--bad); color: var(--bad); }
@@ -118,7 +121,7 @@ function recordChanges(st) {
     const t = st.targets[tid];
     now[tid] = t.state;
     if (before[tid] && before[tid] !== t.state) {
-      events.unshift({ at: new Date(), text: `${st.id.replace(/^ro\//, '')} · ${tid.replace('/default/', '/').replace('/_/', '/')}: ${label(before[tid])} → ${label(t.state)}${t.percent ? ` @ ${t.percent}%` : ''}`, state: t.state });
+      events.unshift({ at: new Date(), text: `${t.mode === 'dark' ? '🌘 ' : ''}${st.id.replace(/^ro\//, '')} · ${tid.replace('/default/', '/').replace('/_/', '/')}: ${label(before[tid])} → ${label(t.state)}${t.percent ? ` @ ${t.percent}%${t.mode === 'dark' ? ' mirrored' : ''}` : ''}`, state: t.state });
     }
   }
   if (before.__state && before.__state !== st.state) events.unshift({ at: new Date(), text: `${st.id} is ${st.state}`, state: st.state });
@@ -136,10 +139,12 @@ function renderTarget(st, tid, changed) {
   if (t.state === 'awaiting_approval') actions.push(`<button class="go" onclick="signal('${esc(st.id)}','${esc(tid)}','approve')">Approve</button>`);
   if (t.state === 'paused') actions.push(`<button class="go" onclick="signal('${esc(st.id)}','${esc(tid)}','retry')">Retry</button>`, `<button class="stop" onclick="signal('${esc(st.id)}','${esc(tid)}','abort')">Abort</button>`);
   const why = t.awaiting_approval?.length ? `awaiting: ${t.awaiting_approval.join(', ')}` : (t.message || '');
-  return `<div class="target s-${t.state} ${changed.has(tid) ? 'flash' : ''}" data-tid="${esc(tid)}">
+  const dark = t.mode === 'dark';
+  return `<div class="target s-${t.state} ${dark ? 'dark' : ''} ${changed.has(tid) ? 'flash' : ''}" data-tid="${esc(tid)}">
     <div class="trow"><span class="region">${esc(t.region)}</span>
       <span class="bar"><i class="s-${t.state}" style="width:${t.percent || 0}%"></i></span>
       <span class="pct">${t.percent || 0}%</span></div>
+    ${dark ? '<div class="mirror">🌘 mirrored traffic · responses discarded</div>' : ''}
     <div class="tmeta"><span class="badge s-${t.state}">${label(t.state)}</span>
       <span>step ${t.step || 0}/${t.steps || 0}</span><span class="why" title="${esc(why)}">${esc(why)}</span>${actions.join('')}</div>
   </div>`;
@@ -163,7 +168,8 @@ function renderRollout(st, changed) {
     }
     const ts = s.ids.map(id => st.targets[id]);
     const done = ts.filter(t => t.state === 'succeeded').length;
-    return `<div class="stage ${stageClass(ts)}"><div class="sname"><span>${esc(s.name)}</span><span>${done}/${ts.length}</span></div>${html}</div>`;
+    const isDark = ts.some(t => t.mode === 'dark');
+    return `<div class="stage ${stageClass(ts)} ${isDark ? 'darkstage' : ''}"><div class="sname"><span>${isDark ? '🌘 ' : ''}${esc(s.name)}</span><span>${done}/${ts.length}</span></div>${html}</div>`;
   }).join('<div class="arrow">→</div>');
   const running = !['SUCCEEDED', 'HELD', 'ABORTED'].includes(st.state);
   const extra = st.waiting_for_stage ? ` (stage ${esc(st.waiting_for_stage)} busy)` : '';

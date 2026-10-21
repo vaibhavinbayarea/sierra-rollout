@@ -50,6 +50,15 @@ holds whatever the policy author wrote under `params`, as a
   25% of v2", never "add 15%". Temporal retries activities and replays
   after worker restarts, so the same call can arrive more than once.
 - `Current` returns the target's current percentage and version.
+- **Modes.** `SetPercentRequest.mode` and `CurrentRequest.mode` are
+  `RAMP_MODE_LIVE` (customer traffic) or `RAMP_MODE_SHADOW` (mirrored
+  traffic for dark canaries; responses are discarded). Treat
+  `RAMP_MODE_UNSPECIFIED` as live, so rampers written before modes existed
+  keep working. Live and shadow percentages are independent state. To be
+  usable for dark canaries, support shadow, list `"shadow"` in
+  `DescribeResponse.modes`, and declare `modes: [live, shadow]` in
+  `plugins.yaml`. The platform sets shadow back to 0% when a dark phase
+  ends.
 
 **Validators**
 - Must be **stateless**. Everything you need is in the request.
@@ -142,6 +151,8 @@ three things:
 - `Validate` returns a defined outcome, and does so again on a repeated
   call.
 - `SetPercent` is idempotent.
+- If `Describe` lists `shadow` in `modes`: shadow `SetPercent` is
+  idempotent and doesn't change the live percentage.
 
 ```go
 func TestContract(t *testing.T) {
@@ -165,6 +176,7 @@ plugins:
     endpoint: csat-plugin.eval:9000
     timeout: 2m                    # optional; per call
     params_schema: schemas/csat.json   # optional; path relative to plugins.yaml
+    # modes: [live, shadow]        # rampers only; default [live]. Add shadow for dark canaries.
 ```
 
 Put your schema file under `schemas/`, matching what `Describe` returns.

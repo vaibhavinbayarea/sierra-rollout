@@ -3,6 +3,10 @@ staging
   default
     _
       us-east-1    succeeded          step 1/1 @ 100%
+prod-dark
+  canary
+    acme
+      us-east-1    baking             step 1/2 @ 50% mirrored
 prod
   canary
     acme

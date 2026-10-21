@@ -1,4 +1,5 @@
 # Act 1 (and Act 2): one team, full staging → pre-prod → prod ramp with manual sign-off on the prod canary.
+# Prod starts with a dark canary: every prod target gets mirrored traffic first.
 apiVersion: rollout/v1
 agent: agent-foobar
 ramper: { plugin: mock-ramper, params: { service: agent-foobar } }
@@ -26,6 +27,9 @@ stages:
     validate: [health, error-rate]
   - name: prod
     validate: [health, error-rate]
+    dark:
+      mirror: [50, 100]
+      validate: [error-rate]
     waves:
       - name: canary
         customers: [acme]

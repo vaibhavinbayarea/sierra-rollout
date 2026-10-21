@@ -304,3 +304,51 @@ stages:
 		recordHistories(t, "ro/siblings/stage/prod")
 	}
 }
+
+// darkPolicy is a one-stage prod rollout behind a dark canary; the dark
+// phase validates with check (health passes, always-fail fails).
+func darkPolicy(agent, check string) []byte {
+	return []byte(fmt.Sprintf(`apiVersion: rollout/v1
+agent: %s
+ramper: { plugin: mock-ramper }
+defaults: { steps: [100], bake: 1s }
+validations:
+  health:      { plugin: http-health, params: { path: /h } }
+  always-fail: { plugin: prometheus, params: { query: q, stub: { outcome: FAIL } } }
+stages:
+  - name: prod
+    regions: [us-east-1, eu-west-1]
+    validate: [health]
+    on_failure: [hold]
+    dark: { mirror: [50, 100], validate: [%s] }
+`, agent, check))
+}
+
+func TestDarkThenLive(t *testing.T) {
+	id := start(t, darkPolicy("darkpass", "health"), "v1")
+	st, seen := drive(t, id, 2*time.Minute)
+	require.Equal(t, workflows.Succeeded, st.State)
+	assert.True(t, seen[workflows.StateBaking])
+	for _, region := range []string{"us-east-1", "eu-west-1"} {
+		d := st.Targets["prod-dark/default/_/"+region]
+		assert.Equal(t, workflows.StateSucceeded, d.State)
+		assert.Equal(t, "dark", d.Mode)
+		assert.Equal(t, 0, d.Percent, "mirroring torn down")
+		assert.Equal(t, 100, st.Targets["prod/default/_/"+region].Percent)
+	}
+	if *record {
+		recordHistories(t, id+"/prod-dark/default/_/us-east-1")
+	}
+}
+
+func TestFailingDarkSkipsProd(t *testing.T) {
+	id := start(t, darkPolicy("darkfail", "always-fail"), "v1")
+	st, _ := drive(t, id, 2*time.Minute)
+	assert.Equal(t, workflows.Held, st.State)
+	for _, region := range []string{"us-east-1", "eu-west-1"} {
+		d := st.Targets["prod-dark/default/_/"+region]
+		assert.Equal(t, workflows.StateHeld, d.State)
+		assert.Equal(t, 0, d.Percent, "mirroring torn down on hold")
+		assert.Equal(t, workflows.StateSkipped, st.Targets["prod/default/_/"+region].State)
+	}
+}
