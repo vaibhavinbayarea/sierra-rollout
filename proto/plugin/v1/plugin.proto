@@ -1,0 +1,96 @@
+syntax = "proto3";
+
+package plugin.v1;
+
+import "google/protobuf/struct.proto";
+
+option go_package = "sierra-rollout/proto/plugin/v1;pluginv1";
+
+// Target identifies the unit being rolled out.
+message Target {
+  string agent = 1;
+  string stage = 2;
+  string wave = 3;
+  string customer = 4;
+  string region = 5;
+}
+
+message DescribeRequest {}
+
+message DescribeResponse {
+  string name = 1;
+  string kind = 2; // ramper | validator | notifier
+  string version = 3;
+  string params_json_schema = 4;
+}
+
+// SetPercent must be idempotent and absolute.
+message SetPercentRequest {
+  Target target = 1;
+  string version = 2;
+  int32 percent = 3;
+  google.protobuf.Struct params = 4;
+}
+
+message SetPercentResponse {
+  int32 percent = 1;
+  string version = 2;
+}
+
+message CurrentRequest {
+  Target target = 1;
+}
+
+message CurrentResponse {
+  int32 percent = 1;
+  string version = 2;
+}
+
+service RamperService {
+  rpc SetPercent(SetPercentRequest) returns (SetPercentResponse);
+  rpc Current(CurrentRequest) returns (CurrentResponse);
+  rpc Describe(DescribeRequest) returns (DescribeResponse);
+}
+
+enum Outcome {
+  OUTCOME_UNSPECIFIED = 0;
+  OUTCOME_PASS = 1;
+  OUTCOME_FAIL = 2;
+  OUTCOME_INCONCLUSIVE = 3;
+  OUTCOME_AWAIT_SIGNAL = 4;
+}
+
+message ValidateRequest {
+  Target target = 1;
+  string version = 2;
+  int32 step = 3;    // 0-based
+  int32 percent = 4;
+  int32 attempt = 5; // 1-based
+  google.protobuf.Struct params = 6;
+}
+
+message ValidateResponse {
+  Outcome outcome = 1;
+  string summary = 2;
+  google.protobuf.Struct evidence = 3;
+}
+
+service ValidatorService {
+  rpc Validate(ValidateRequest) returns (ValidateResponse);
+  rpc Describe(DescribeRequest) returns (DescribeResponse);
+}
+
+message NotifyRequest {
+  string rollout_id = 1;
+  Target target = 2;
+  string kind = 3;
+  string message = 4;
+  google.protobuf.Struct details = 5;
+}
+
+message NotifyResponse {}
+
+service NotifierService {
+  rpc Notify(NotifyRequest) returns (NotifyResponse);
+  rpc Describe(DescribeRequest) returns (DescribeResponse);
+}
