@@ -45,7 +45,25 @@ expect_exit() {
 }
 
 # ---------- rollout helpers ----------
-rollout_state() { "$R" status "$1" 2>/dev/null | head -1 | awk '{print $3}'; }
+# approve ID TARGET [VALIDATION]: approves a waiting target. If it was
+# already approved elsewhere (e.g. the dashboard's Approve button), the API
+# refuses with "target is <state>"; that counts as done.
+approve() {
+  local id=$1 tid=$2 v=${3:-} out code
+  local args=(approve "$id" --target "$tid")
+  [[ -n "$v" ]] && args+=(--validation "$v")
+  printf '%s$ %s %s%s\n' "$dim" "$R" "${args[*]}" "$reset"
+  set +e; out=$("$R" "${args[@]}" 2>&1); code=$?; set -e
+  [[ -n "$out" ]] && echo "$out"
+  if [[ $code == 3 && $out == *"target is "* && $out != *"target is awaiting_approval"* ]]; then
+    say "already approved (e.g. from the dashboard), continuing"
+    return 0
+  fi
+  return $code
+}
+
+# rollout_state ID: prints the rollout's state, or nothing if it doesn't exist.
+rollout_state() { { "$R" status "$1" 2>/dev/null || true; } | head -1 | awk '{print $3}'; }
 
 # wait_until ID REGEX [TIMEOUT_S] — waits until `status ID` output matches.
 wait_until() {
@@ -83,6 +101,20 @@ trap cleanup EXIT
 
 port_open() { nc -z 127.0.0.1 "$1" >/dev/null 2>&1; }
 
+# cleanup_previous aborts demo rollouts a previous, interrupted demo run left
+# running on the dev server; otherwise Act 1's start would be refused.
+cleanup_previous() {
+  local id st
+  for a in agent-foobar sdk-core agent-foobar-1 agent-foobar-2 agent-foobar-3; do
+    id="ro/$a"
+    st=$(rollout_state "$id")
+    [[ -z "$st" || $st =~ ^(SUCCEEDED|HELD|ABORTED)$ ]] && continue
+    say "aborting $id left running by an earlier demo run"
+    "$R" abort "$id" >/dev/null 2>&1 || true
+    wait_until "$id" '(SUCCEEDED|HELD|ABORTED)' 60
+  done
+}
+
 setup() {
   command -v "$TEMPORAL" >/dev/null || { echo "temporal CLI not found: brew install temporal (or set TEMPORAL=/path)"; exit 1; }
   mkdir -p "$LOGS" "$ROOT/bin"
@@ -99,6 +131,7 @@ setup() {
   "$ROOT/bin/worker" --registry "$DEMO/plugins.yaml" >"$LOGS/worker.log" 2>&1 & PIDS+=($!)
   "$ROOT/bin/server" --registry "$DEMO/plugins.yaml" >"$LOGS/server.log" 2>&1 & PIDS+=($!)
   until port_open 8080; do sleep 0.5; done
+  cleanup_previous
   say "worker + API up (logs: demo/.logs/)."
   say "Live dashboard: $ROLLOUT_SERVER/ui   ·   Temporal UI: http://localhost:8233"
   [[ "${DEMO_AUTO:-}" == 1 || "${DEMO_OPEN:-1}" == 0 ]] || open "$ROLLOUT_SERVER/ui" 2>/dev/null || true
@@ -116,11 +149,11 @@ act1() {
   run "$R" start -f "$DEMO/policies/agent-foobar.yaml" --version v1.0.0
   say "Each target ramps 10% → 50% → 100%, baking and validating after every step."
   say "Before any customer sees prod, prod-dark mirrors real traffic to v1 for every prod target (responses discarded), validates it, then tears mirroring down."
-  wait_until ro/agent-foobar awaiting_approval 180
+  wait_until ro/agent-foobar 'awaiting_approval|SUCCEEDED' 180   # SUCCEEDED: already approved on the dashboard
   run "$R" status ro/agent-foobar
-  say "The prod canary waits for a human. Approve the sign-off:"
+  say "The prod canary waits for a human. Approve the sign-off here (enter), or click Approve on the dashboard:"
   pause
-  run "$R" approve ro/agent-foobar --target prod/canary/acme/us-east-1 --validation signoff
+  approve ro/agent-foobar prod/canary/acme/us-east-1 signoff
   wait_until ro/agent-foobar 'SUCCEEDED' 180
   run "$R" status ro/agent-foobar
   say "Every traffic change the ramper made, in order:"
@@ -134,8 +167,8 @@ act2() {
   run "$R" start -f "$DEMO/policies/sdk-core.yaml" --version v2.0.0
   run "$R" start -f "$DEMO/policies/agent-foobar.yaml" --version v1.1.0
   say "agent-foobar still needs its canary sign-off; approving it as soon as it asks."
-  wait_until ro/agent-foobar awaiting_approval 240
-  run "$R" approve ro/agent-foobar --target prod/canary/acme/us-east-1
+  wait_until ro/agent-foobar 'awaiting_approval|SUCCEEDED' 240
+  approve ro/agent-foobar prod/canary/acme/us-east-1
   watch_all ro/sdk-core ro/agent-foobar
   say "Interleaved ramps from the worker log (both teams progressing in parallel):"
   grep "mock ramp" "$LOGS/worker.log" | grep -E "Agent:(sdk-core|agent-foobar) " | tail -n 12 |
