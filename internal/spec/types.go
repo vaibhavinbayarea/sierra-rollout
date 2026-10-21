@@ -44,6 +44,23 @@ type Stage struct {
 	Name      string `yaml:"name"`
 	Overrides `yaml:",inline"`
 	Waves     []Wave `yaml:"waves"`
+	Dark      *Dark  `yaml:"dark"`
+}
+
+// Dark is a dark canary gate: mirrored traffic to every target of the
+// stage, validated before the stage's live waves start.
+type Dark struct {
+	Mirror    []int           `yaml:"mirror"`
+	Bake      *Duration       `yaml:"bake"`
+	Validate  []string        `yaml:"validate"`
+	Decision  *Decision       `yaml:"decision"`
+	OnFailure []FailureAction `yaml:"on_failure"`
+	Ramper    *PluginCall     `yaml:"ramper"`
+}
+
+// Overrides returns the dark block as an override level (mirror excluded).
+func (d *Dark) Overrides() Overrides {
+	return Overrides{Ramper: d.Ramper, Bake: d.Bake, Decision: d.Decision, OnFailure: d.OnFailure, Validate: d.Validate}
 }
 
 type Wave struct {

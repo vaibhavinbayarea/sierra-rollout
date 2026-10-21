@@ -42,7 +42,7 @@ func compileSrc(t *testing.T, src string) *plan.Plan {
 }
 
 func TestCompileGolden(t *testing.T) {
-	for _, name := range []string{"full", "minimal", "staging-only"} {
+	for _, name := range []string{"full", "minimal", "staging-only", "dark"} {
 		t.Run(name, func(t *testing.T) {
 			got, err := json.MarshalIndent(compileFile(t, name+".yaml"), "", "  ")
 			require.NoError(t, err)

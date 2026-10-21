@@ -46,6 +46,9 @@ func Compile(policy []byte, reg *registry.Registry, version string) (*plan.Plan,
 		Plugins:    map[string]plan.PluginRef{},
 	}
 	for _, st := range p.Stages {
+		if st.Dark != nil {
+			out.Stages = append(out.Stages, resolveDark(p, st))
+		}
 		out.Stages = append(out.Stages, resolveStage(p, st))
 	}
 	for _, t := range out.Targets() {
@@ -55,7 +58,11 @@ func Compile(policy []byte, reg *registry.Registry, version string) (*plan.Plan,
 			if to == 0 {
 				to = kindTimeouts[e.Kind]
 			}
-			out.Plugins[name] = plan.PluginRef{Name: name, Kind: string(e.Kind), Builtin: e.Builtin, Endpoint: e.Endpoint, Timeout: to}
+			ref := plan.PluginRef{Name: name, Kind: string(e.Kind), Builtin: e.Builtin, Endpoint: e.Endpoint, Timeout: to}
+			if e.Kind == registry.KindRamper {
+				ref.Modes = e.Modes
+			}
+			out.Plugins[name] = ref
 		}
 		use(t.Ramper.Plugin)
 		use(t.Decision.WarningNotifier)
@@ -97,6 +104,30 @@ func resolveStage(p *spec.Policy, st spec.Stage) plan.StagePlan {
 		sp.Waves = append(sp.Waves, wp)
 	}
 	return sp
+}
+
+// resolveDark expands a stage's dark block into a <stage>-dark stage with
+// one dark target per live target, all in a single fully parallel wave.
+func resolveDark(p *spec.Policy, st spec.Stage) plan.StagePlan {
+	name := st.Name + "-dark"
+	levels := []spec.Overrides{st.Dark.Overrides(), st.Overrides, p.Defaults}
+	wp := plan.WavePlan{Name: "dark"}
+	for _, w := range waves(st) {
+		regions := first([]spec.Overrides{w.Overrides, st.Overrides, p.Defaults}, func(o spec.Overrides) []string { return o.Regions })
+		for _, c := range w.Customers {
+			for _, region := range regions {
+				t := resolveTarget(p, levels, name, w.Name, c, region)
+				t.Mode = "dark"
+				t.Steps = []int{100}
+				if st.Dark.Mirror != nil {
+					t.Steps = st.Dark.Mirror
+				}
+				wp.Customers = append(wp.Customers, plan.CustomerPlan{Customer: c, Targets: []plan.TargetPlan{t}})
+			}
+		}
+	}
+	wp.MaxParallel = max(len(wp.Customers), 1)
+	return plan.StagePlan{Name: name, Waves: []plan.WavePlan{wp}}
 }
 
 func resolveTarget(p *spec.Policy, levels []spec.Overrides, stage, wave, customer, region string) plan.TargetPlan {

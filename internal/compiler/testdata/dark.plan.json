@@ -1,0 +1,579 @@
+{
+  "id": "ro/dark-agent",
+  "agent": "dark-agent",
+  "version": "v1.4.2",
+  "policy_hash": "9482b6e2e44a2505468e2a21d0d09c9db9e7365429aaa7eb9053add8400cd85e",
+  "pipelining": false,
+  "plugins": {
+    "http-health": {
+      "name": "http-health",
+      "kind": "validator",
+      "builtin": true,
+      "timeout": 120000000000
+    },
+    "log-notifier": {
+      "name": "log-notifier",
+      "kind": "notifier",
+      "builtin": true,
+      "timeout": 30000000000
+    },
+    "mock-ramper": {
+      "name": "mock-ramper",
+      "kind": "ramper",
+      "builtin": true,
+      "timeout": 300000000000,
+      "modes": [
+        "live",
+        "shadow"
+      ]
+    },
+    "prometheus": {
+      "name": "prometheus",
+      "kind": "validator",
+      "builtin": true,
+      "timeout": 120000000000
+    }
+  },
+  "stages": [
+    {
+      "name": "staging",
+      "waves": [
+        {
+          "name": "default",
+          "max_parallel": 1,
+          "customers": [
+            {
+              "customer": "_",
+              "targets": [
+                {
+                  "id": "staging/default/_/us-east-1",
+                  "stage": "staging",
+                  "wave": "default",
+                  "customer": "_",
+                  "region": "us-east-1",
+                  "ramper": {
+                    "plugin": "mock-ramper"
+                  },
+                  "steps": [
+                    10,
+                    100
+                  ],
+                  "bake": 300000000000,
+                  "validations": [
+                    {
+                      "name": "health",
+                      "plugin": "http-health",
+                      "params": {
+                        "path": "/h"
+                      },
+                      "severity": "critical",
+                      "when": "every_step"
+                    }
+                  ],
+                  "decision": {
+                    "critical": "all_pass",
+                    "warning": "notify",
+                    "warning_notifier": "log-notifier",
+                    "inconclusive": {
+                      "retry": 3,
+                      "backoff": 60000000000,
+                      "then": "fail"
+                    }
+                  },
+                  "on_failure": [
+                    {
+                      "kind": "hold"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "prod-dark",
+      "waves": [
+        {
+          "name": "dark",
+          "max_parallel": 5,
+          "customers": [
+            {
+              "customer": "acme",
+              "targets": [
+                {
+                  "id": "prod-dark/canary/acme/us-east-1",
+                  "stage": "prod-dark",
+                  "wave": "canary",
+                  "customer": "acme",
+                  "region": "us-east-1",
+                  "ramper": {
+                    "plugin": "mock-ramper"
+                  },
+                  "steps": [
+                    50,
+                    100
+                  ],
+                  "bake": 600000000000,
+                  "validations": [
+                    {
+                      "name": "diff",
+                      "plugin": "prometheus",
+                      "params": {
+                        "query": "diff"
+                      },
+                      "severity": "critical",
+                      "when": "every_step"
+                    }
+                  ],
+                  "decision": {
+                    "critical": "all_pass",
+                    "warning": "notify",
+                    "warning_notifier": "log-notifier",
+                    "inconclusive": {
+                      "retry": 3,
+                      "backoff": 60000000000,
+                      "then": "fail"
+                    }
+                  },
+                  "on_failure": [
+                    {
+                      "kind": "hold"
+                    }
+                  ],
+                  "mode": "dark"
+                }
+              ]
+            },
+            {
+              "customer": "globex",
+              "targets": [
+                {
+                  "id": "prod-dark/broad/globex/us-east-1",
+                  "stage": "prod-dark",
+                  "wave": "broad",
+                  "customer": "globex",
+                  "region": "us-east-1",
+                  "ramper": {
+                    "plugin": "mock-ramper"
+                  },
+                  "steps": [
+                    50,
+                    100
+                  ],
+                  "bake": 600000000000,
+                  "validations": [
+                    {
+                      "name": "diff",
+                      "plugin": "prometheus",
+                      "params": {
+                        "query": "diff"
+                      },
+                      "severity": "critical",
+                      "when": "every_step"
+                    }
+                  ],
+                  "decision": {
+                    "critical": "all_pass",
+                    "warning": "notify",
+                    "warning_notifier": "log-notifier",
+                    "inconclusive": {
+                      "retry": 3,
+                      "backoff": 60000000000,
+                      "then": "fail"
+                    }
+                  },
+                  "on_failure": [
+                    {
+                      "kind": "hold"
+                    }
+                  ],
+                  "mode": "dark"
+                }
+              ]
+            },
+            {
+              "customer": "globex",
+              "targets": [
+                {
+                  "id": "prod-dark/broad/globex/eu-west-1",
+                  "stage": "prod-dark",
+                  "wave": "broad",
+                  "customer": "globex",
+                  "region": "eu-west-1",
+                  "ramper": {
+                    "plugin": "mock-ramper"
+                  },
+                  "steps": [
+                    50,
+                    100
+                  ],
+                  "bake": 600000000000,
+                  "validations": [
+                    {
+                      "name": "diff",
+                      "plugin": "prometheus",
+                      "params": {
+                        "query": "diff"
+                      },
+                      "severity": "critical",
+                      "when": "every_step"
+                    }
+                  ],
+                  "decision": {
+                    "critical": "all_pass",
+                    "warning": "notify",
+                    "warning_notifier": "log-notifier",
+                    "inconclusive": {
+                      "retry": 3,
+                      "backoff": 60000000000,
+                      "then": "fail"
+                    }
+                  },
+                  "on_failure": [
+                    {
+                      "kind": "hold"
+                    }
+                  ],
+                  "mode": "dark"
+                }
+              ]
+            },
+            {
+              "customer": "initech",
+              "targets": [
+                {
+                  "id": "prod-dark/broad/initech/us-east-1",
+                  "stage": "prod-dark",
+                  "wave": "broad",
+                  "customer": "initech",
+                  "region": "us-east-1",
+                  "ramper": {
+                    "plugin": "mock-ramper"
+                  },
+                  "steps": [
+                    50,
+                    100
+                  ],
+                  "bake": 600000000000,
+                  "validations": [
+                    {
+                      "name": "diff",
+                      "plugin": "prometheus",
+                      "params": {
+                        "query": "diff"
+                      },
+                      "severity": "critical",
+                      "when": "every_step"
+                    }
+                  ],
+                  "decision": {
+                    "critical": "all_pass",
+                    "warning": "notify",
+                    "warning_notifier": "log-notifier",
+                    "inconclusive": {
+                      "retry": 3,
+                      "backoff": 60000000000,
+                      "then": "fail"
+                    }
+                  },
+                  "on_failure": [
+                    {
+                      "kind": "hold"
+                    }
+                  ],
+                  "mode": "dark"
+                }
+              ]
+            },
+            {
+              "customer": "initech",
+              "targets": [
+                {
+                  "id": "prod-dark/broad/initech/eu-west-1",
+                  "stage": "prod-dark",
+                  "wave": "broad",
+                  "customer": "initech",
+                  "region": "eu-west-1",
+                  "ramper": {
+                    "plugin": "mock-ramper"
+                  },
+                  "steps": [
+                    50,
+                    100
+                  ],
+                  "bake": 600000000000,
+                  "validations": [
+                    {
+                      "name": "diff",
+                      "plugin": "prometheus",
+                      "params": {
+                        "query": "diff"
+                      },
+                      "severity": "critical",
+                      "when": "every_step"
+                    }
+                  ],
+                  "decision": {
+                    "critical": "all_pass",
+                    "warning": "notify",
+                    "warning_notifier": "log-notifier",
+                    "inconclusive": {
+                      "retry": 3,
+                      "backoff": 60000000000,
+                      "then": "fail"
+                    }
+                  },
+                  "on_failure": [
+                    {
+                      "kind": "hold"
+                    }
+                  ],
+                  "mode": "dark"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "prod",
+      "waves": [
+        {
+          "name": "canary",
+          "max_parallel": 1,
+          "customers": [
+            {
+              "customer": "acme",
+              "targets": [
+                {
+                  "id": "prod/canary/acme/us-east-1",
+                  "stage": "prod",
+                  "wave": "canary",
+                  "customer": "acme",
+                  "region": "us-east-1",
+                  "ramper": {
+                    "plugin": "mock-ramper"
+                  },
+                  "steps": [
+                    10,
+                    100
+                  ],
+                  "bake": 600000000000,
+                  "validations": [
+                    {
+                      "name": "health",
+                      "plugin": "http-health",
+                      "params": {
+                        "path": "/h"
+                      },
+                      "severity": "critical",
+                      "when": "every_step"
+                    }
+                  ],
+                  "decision": {
+                    "critical": "all_pass",
+                    "warning": "notify",
+                    "warning_notifier": "log-notifier",
+                    "inconclusive": {
+                      "retry": 3,
+                      "backoff": 60000000000,
+                      "then": "fail"
+                    }
+                  },
+                  "on_failure": [
+                    {
+                      "kind": "hold"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "broad",
+          "max_parallel": 1,
+          "customers": [
+            {
+              "customer": "globex",
+              "targets": [
+                {
+                  "id": "prod/broad/globex/us-east-1",
+                  "stage": "prod",
+                  "wave": "broad",
+                  "customer": "globex",
+                  "region": "us-east-1",
+                  "ramper": {
+                    "plugin": "mock-ramper"
+                  },
+                  "steps": [
+                    10,
+                    100
+                  ],
+                  "bake": 60000000000,
+                  "validations": [
+                    {
+                      "name": "health",
+                      "plugin": "http-health",
+                      "params": {
+                        "path": "/h"
+                      },
+                      "severity": "critical",
+                      "when": "every_step"
+                    }
+                  ],
+                  "decision": {
+                    "critical": "all_pass",
+                    "warning": "notify",
+                    "warning_notifier": "log-notifier",
+                    "inconclusive": {
+                      "retry": 3,
+                      "backoff": 60000000000,
+                      "then": "fail"
+                    }
+                  },
+                  "on_failure": [
+                    {
+                      "kind": "hold"
+                    }
+                  ]
+                },
+                {
+                  "id": "prod/broad/globex/eu-west-1",
+                  "stage": "prod",
+                  "wave": "broad",
+                  "customer": "globex",
+                  "region": "eu-west-1",
+                  "ramper": {
+                    "plugin": "mock-ramper"
+                  },
+                  "steps": [
+                    10,
+                    100
+                  ],
+                  "bake": 60000000000,
+                  "validations": [
+                    {
+                      "name": "health",
+                      "plugin": "http-health",
+                      "params": {
+                        "path": "/h"
+                      },
+                      "severity": "critical",
+                      "when": "every_step"
+                    }
+                  ],
+                  "decision": {
+                    "critical": "all_pass",
+                    "warning": "notify",
+                    "warning_notifier": "log-notifier",
+                    "inconclusive": {
+                      "retry": 3,
+                      "backoff": 60000000000,
+                      "then": "fail"
+                    }
+                  },
+                  "on_failure": [
+                    {
+                      "kind": "hold"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "customer": "initech",
+              "targets": [
+                {
+                  "id": "prod/broad/initech/us-east-1",
+                  "stage": "prod",
+                  "wave": "broad",
+                  "customer": "initech",
+                  "region": "us-east-1",
+                  "ramper": {
+                    "plugin": "mock-ramper"
+                  },
+                  "steps": [
+                    10,
+                    100
+                  ],
+                  "bake": 60000000000,
+                  "validations": [
+                    {
+                      "name": "health",
+                      "plugin": "http-health",
+                      "params": {
+                        "path": "/h"
+                      },
+                      "severity": "critical",
+                      "when": "every_step"
+                    }
+                  ],
+                  "decision": {
+                    "critical": "all_pass",
+                    "warning": "notify",
+                    "warning_notifier": "log-notifier",
+                    "inconclusive": {
+                      "retry": 3,
+                      "backoff": 60000000000,
+                      "then": "fail"
+                    }
+                  },
+                  "on_failure": [
+                    {
+                      "kind": "hold"
+                    }
+                  ]
+                },
+                {
+                  "id": "prod/broad/initech/eu-west-1",
+                  "stage": "prod",
+                  "wave": "broad",
+                  "customer": "initech",
+                  "region": "eu-west-1",
+                  "ramper": {
+                    "plugin": "mock-ramper"
+                  },
+                  "steps": [
+                    10,
+                    100
+                  ],
+                  "bake": 60000000000,
+                  "validations": [
+                    {
+                      "name": "health",
+                      "plugin": "http-health",
+                      "params": {
+                        "path": "/h"
+                      },
+                      "severity": "critical",
+                      "when": "every_step"
+                    }
+                  ],
+                  "decision": {
+                    "critical": "all_pass",
+                    "warning": "notify",
+                    "warning_notifier": "log-notifier",
+                    "inconclusive": {
+                      "retry": 3,
+                      "backoff": 60000000000,
+                      "then": "fail"
+                    }
+                  },
+                  "on_failure": [
+                    {
+                      "kind": "hold"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

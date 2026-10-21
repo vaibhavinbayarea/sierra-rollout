@@ -3,6 +3,7 @@ package compiler
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -43,6 +44,9 @@ func check(p *spec.Policy, lines *spec.Lines, reg *registry.Registry) []spec.Dia
 		c.add("stages", "at least one stage is required")
 	}
 	stages := map[string]bool{}
+	for _, st := range p.Stages {
+		stages[st.Name] = false
+	}
 	for i, st := range p.Stages {
 		sp := fmt.Sprintf("stages[%d]", i)
 		if st.Name == "" {
@@ -55,6 +59,9 @@ func check(p *spec.Policy, lines *spec.Lines, reg *registry.Registry) []spec.Dia
 		}
 		c.overrides(sp, st.Overrides, p)
 		c.waves(sp, st, p)
+		if st.Dark != nil {
+			c.dark(sp, st, p, stages)
+		}
 	}
 
 	sort.SliceStable(c.diags, func(i, j int) bool {
@@ -140,6 +147,30 @@ func (c *checker) overrides(path string, o spec.Overrides, p *spec.Policy) {
 	for i, v := range o.Validate {
 		if _, ok := p.Validations[v]; !ok {
 			c.add(fmt.Sprintf("%s.validate[%d]", path, i), "undefined validation %q", v)
+		}
+	}
+}
+
+func (c *checker) dark(sp string, st spec.Stage, p *spec.Policy, stages map[string]bool) {
+	dp := sp + ".dark"
+	d := st.Dark
+	if len(d.Validate) == 0 {
+		c.add(dp+".validate", "a dark phase needs at least one validation")
+	}
+	if d.Mirror != nil {
+		c.steps(dp+".mirror", d.Mirror)
+	}
+	c.overrides(dp, d.Overrides(), p)
+	if _, taken := stages[st.Name+"-dark"]; taken {
+		c.add(dp, "dark stage %q collides with stage %q", st.Name+"-dark", st.Name+"-dark")
+	}
+	ramper := first([]spec.Overrides{d.Overrides(), st.Overrides, p.Defaults}, func(o spec.Overrides) *spec.PluginCall { return o.Ramper })
+	if ramper == nil {
+		ramper = p.Ramper
+	}
+	if ramper != nil {
+		if e, ok := c.reg.Get(ramper.Plugin); ok && e.Kind == registry.KindRamper && !slices.Contains(e.Modes, "shadow") {
+			c.add(dp, "ramper %q does not support shadow mode (registry modes: %v)", ramper.Plugin, e.Modes)
 		}
 	}
 }

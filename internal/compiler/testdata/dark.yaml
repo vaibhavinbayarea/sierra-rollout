@@ -1,0 +1,21 @@
+apiVersion: rollout/v1
+agent: dark-agent
+ramper: { plugin: mock-ramper }
+defaults: { steps: [10, 100], bake: 5m, on_failure: [hold] }
+validations:
+  health: { plugin: http-health, params: { path: /h } }
+  diff:   { plugin: prometheus, params: { query: diff } }
+stages:
+  - name: staging
+    regions: [us-east-1]
+    validate: [health]
+  - name: prod
+    bake: 10m
+    regions: [us-east-1, eu-west-1]
+    validate: [health]
+    dark:
+      mirror: [50, 100]
+      validate: [diff]
+    waves:
+      - { name: canary, customers: [acme], regions: [us-east-1] }
+      - { name: broad, customers: [globex, initech], bake: 1m }

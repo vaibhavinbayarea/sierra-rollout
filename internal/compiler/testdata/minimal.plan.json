@@ -15,7 +15,11 @@
       "name": "mock-ramper",
       "kind": "ramper",
       "builtin": true,
-      "timeout": 300000000000
+      "timeout": 300000000000,
+      "modes": [
+        "live",
+        "shadow"
+      ]
     }
   },
   "stages": [

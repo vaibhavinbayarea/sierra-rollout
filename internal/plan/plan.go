@@ -45,6 +45,7 @@ type TargetPlan struct {
 	Validations []ValidationCall `json:"validations"`
 	Decision    DecisionRule     `json:"decision"`
 	OnFailure   []FailureAction  `json:"on_failure"`
+	Mode        string           `json:"mode,omitempty"` // "" (live) or "dark"
 }
 
 // PluginRef is a registry entry frozen into the plan.
@@ -54,6 +55,7 @@ type PluginRef struct {
 	Builtin  bool          `json:"builtin"`
 	Endpoint string        `json:"endpoint,omitempty"`
 	Timeout  time.Duration `json:"timeout"`
+	Modes    []string      `json:"modes,omitempty"` // ramper traffic modes
 }
 
 type PluginCall struct {
