@@ -36,6 +36,7 @@ type TargetStatus struct {
 	Wave             string                  `json:"wave"`
 	Customer         string                  `json:"customer"`
 	Region           string                  `json:"region"`
+	Mode             string                  `json:"mode,omitempty"` // "dark" for mirrored targets
 	State            string                  `json:"state"`
 	Step             int                     `json:"step"`
 	Steps            int                     `json:"steps"`

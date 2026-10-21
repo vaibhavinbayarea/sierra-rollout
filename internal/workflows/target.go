@@ -60,7 +60,7 @@ func TargetRollout(ctx workflow.Context, in TargetInput) (TargetResult, error) {
 	t := in.Target
 	r := &runner{ctx: ctx, in: in, t: t, status: TargetStatus{
 		ID: t.ID, Stage: t.Stage, Wave: t.Wave, Customer: t.Customer, Region: t.Region,
-		State: StatePending, Steps: len(t.Steps), Verdicts: map[string]plan.Verdict{},
+		State: StatePending, Steps: len(t.Steps), Verdicts: map[string]plan.Verdict{}, Mode: t.Mode,
 	}}
 	r.signalLoop()
 	res, err := r.run()
@@ -136,10 +136,17 @@ func (r *runner) run() (TargetResult, error) {
 
 func (r *runner) ramp(pct int) error {
 	r.setState(StateRamping, "")
+	return r.setPercent(pct)
+}
+
+// setPercent ramps live traffic, or mirrored traffic for dark targets.
+func (r *runner) setPercent(pct int) error {
+	in := activities.RampInput{Ramper: r.t.Ramper, Target: r.target(), Version: r.in.Version, Percent: pct}
+	if r.t.Mode == "dark" {
+		in.Mode = plugin.ModeShadow
+	}
 	ctx := r.activityCtx(r.t.Ramper.Plugin, 5*time.Minute, 5)
-	err := workflow.ExecuteActivity(ctx, "Ramp", activities.RampInput{
-		Ramper: r.t.Ramper, Target: r.target(), Version: r.in.Version, Percent: pct,
-	}).Get(ctx, nil)
+	err := workflow.ExecuteActivity(ctx, "Ramp", in).Get(ctx, nil)
 	if err == nil {
 		r.status.Percent = pct
 	}
@@ -324,6 +331,16 @@ func (r *runner) abort() TargetResult {
 }
 
 func (r *runner) end(status, state, msg string) TargetResult {
+	if r.t.Mode == "dark" {
+		// Mirroring is always torn down, whatever the outcome.
+		if err := r.setPercent(0); err != nil {
+			workflow.GetLogger(r.ctx).Error("mirror teardown failed", "error", err)
+			if msg != "" {
+				msg += "; "
+			}
+			msg += "mirror teardown failed: " + err.Error()
+		}
+	}
 	r.setState(state, msg)
 	return TargetResult{Status: status, Message: msg}
 }

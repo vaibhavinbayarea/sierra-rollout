@@ -24,6 +24,7 @@ type RampInput struct {
 	Target  plugin.Target
 	Version string
 	Percent int
+	Mode    string `json:",omitempty"` // plugin.ModeShadow for dark targets; empty means live
 }
 
 type ValidateInput struct {
@@ -45,7 +46,7 @@ func (a *Activities) Ramp(ctx context.Context, in RampInput) error {
 	if err != nil {
 		return missing(err)
 	}
-	_, err = r.SetPercent(ctx, plugin.RampRequest{Target: in.Target, Version: in.Version, Percent: in.Percent, Params: in.Ramper.Params})
+	_, err = r.SetPercent(ctx, plugin.RampRequest{Target: in.Target, Version: in.Version, Percent: in.Percent, Mode: in.Mode, Params: in.Ramper.Params})
 	return err
 }
 
